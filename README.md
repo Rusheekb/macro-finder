@@ -1,73 +1,162 @@
-# Welcome to your Lovable project
+# MacroFinder 🥗
 
-## Project info
+A smart nutrition discovery app that helps you find foods matching your macro targets for bulking or cutting goals. Built with React, TypeScript, Tailwind CSS, and Supabase.
 
-**URL**: https://lovable.dev/projects/cceceb6f-ff6d-4617-a4aa-1c1923335399
+## ✨ Features
 
-## How can I edit this code?
+- **Smart Mode Selection**: Switch between bulking and cutting with optimized defaults
+- **Macro Targeting**: Set precise protein and calorie goals  
+- **Weighted Scoring**: Customize importance of protein match, calories, and distance
+- **Location-Based**: Find foods within your specified radius
+- **Price Filtering**: Set budget caps for affordable options
+- **Shareable URLs**: All search parameters saved in URL for easy sharing
+- **Responsive Design**: Beautiful mobile-first interface with dark mode
 
-There are several ways of editing your application.
+## 🛠 Tech Stack
 
-**Use Lovable**
+- **Frontend**: React 18 + Vite + TypeScript
+- **Styling**: Tailwind CSS + shadcn/ui components  
+- **Routing**: React Router v6 with URL state management
+- **Backend**: Supabase (database + auth + edge functions)
+- **APIs**: Nutritionix, Yelp, Google Maps integration ready
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/cceceb6f-ff6d-4617-a4aa-1c1923335399) and start prompting.
+## 🚀 Quick Start
 
-Changes made via Lovable will be committed automatically to this repo.
+### Prerequisites
+- Node.js 18+ and npm
+- Supabase account (for database and APIs)
 
-**Use your preferred IDE**
+### Installation
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/yourusername/macro-finder.git
+   cd macro-finder
+   ```
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
 
-Follow these steps:
+3. **Environment setup**
+   ```bash
+   cp .env.example .env.local
+   # Edit .env.local with your API keys
+   ```
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+4. **Start development server**
+   ```bash
+   npm run dev
+   ```
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+5. **Open in browser**
+   Navigate to `http://localhost:5173`
 
-# Step 3: Install the necessary dependencies.
-npm i
+### Supabase Setup (Local Development)
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+1. **Install Supabase CLI**
+   ```bash
+   npm install -g supabase
+   ```
+
+2. **Initialize local Supabase**
+   ```bash
+   supabase init
+   supabase start
+   ```
+
+3. **Run migrations**
+   ```bash
+   supabase db reset
+   ```
+
+## 📁 Project Structure
+
+```
+src/
+├── components/           # Reusable UI components
+│   ├── ControlsPanel.tsx # Macro targets and search controls
+│   ├── ResultsTable.tsx  # Ranked food results display
+│   ├── Loader.tsx       # Loading skeleton components
+│   └── ui/              # shadcn/ui base components
+├── pages/
+│   ├── Landing.tsx      # Mode selection and intro
+│   ├── MacroApp.tsx     # Main application interface
+│   └── NotFound.tsx     # 404 error page
+├── api/
+│   └── rank.ts          # Food ranking algorithm & API types
+├── lib/
+│   └── utils.ts         # Utility functions
+└── hooks/               # Custom React hooks
 ```
 
-**Edit a file directly in GitHub**
+## 🔧 Available Scripts
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+- `npm run dev` - Start development server
+- `npm run build` - Build for production  
+- `npm run preview` - Preview production build
+- `npm run lint` - Run ESLint
+- `npm run type-check` - Run TypeScript compiler
 
-**Use GitHub Codespaces**
+## 🌐 API Integration
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+The app is designed to integrate with multiple food and location APIs:
 
-## What technologies are used for this project?
+### Nutritionix API
+- Comprehensive food nutrition database
+- Restaurant menu items and nutritional data
 
-This project is built with:
+### Yelp Fusion API  
+- Restaurant locations and details
+- Reviews, ratings, and contact info
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+### Google Maps API
+- Distance calculations between user and restaurants
+- Geocoding for address lookups
 
-## How can I deploy this project?
+## 📊 Scoring Algorithm
 
-Simply open [Lovable](https://lovable.dev/projects/cceceb6f-ff6d-4617-a4aa-1c1923335399) and click on Share -> Publish.
+Foods are ranked using a weighted scoring system:
 
-## Can I connect a custom domain to my Lovable project?
+```typescript
+score = (wP × proteinMatch) + (wC × calorieMatch) + (wR × distanceScore)
+```
 
-Yes, you can!
+Where:
+- `proteinMatch`: How close food protein is to target (0-1)
+- `calorieMatch`: How close food calories are to target (0-1)  
+- `distanceScore`: Proximity score based on distance (0-1)
+- `wP`, `wC`, `wR`: User-defined weights for each factor
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## 🎨 Design System
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+The app uses a cohesive design system with:
+- **Colors**: Green primary theme for health/fitness
+- **Typography**: Clean, readable font hierarchy
+- **Components**: Consistent spacing, shadows, and rounded corners
+- **Responsive**: Mobile-first with breakpoint optimization
+- **Dark Mode**: Automatic theme switching support
+
+## 🚧 Roadmap
+
+- [ ] Complete API integrations (Nutritionix, Yelp, Google Maps)
+- [ ] User authentication and saved preferences  
+- [ ] Meal planning and favorites system
+- [ ] Nutritional goal tracking over time
+- [ ] Social sharing of macro discoveries
+- [ ] Advanced filtering (dietary restrictions, cuisine types)
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🤝 Contributing
+
+Contributions welcome! Please read our [contributing guidelines](CONTRIBUTING.md) first.
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit changes (`git commit -m 'Add amazing feature'`)
+4. Push to branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
