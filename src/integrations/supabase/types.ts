@@ -14,7 +14,163 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      brands: {
+        Row: {
+          chain_key: string
+          created_at: string | null
+          display_name: string
+          id: string
+          updated_at: string | null
+        }
+        Insert: {
+          chain_key: string
+          created_at?: string | null
+          display_name: string
+          id?: string
+          updated_at?: string | null
+        }
+        Update: {
+          chain_key?: string
+          created_at?: string | null
+          display_name?: string
+          id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      local_prices: {
+        Row: {
+          item_id: string
+          price: number
+          restaurant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          item_id: string
+          price: number
+          restaurant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          item_id?: string
+          price?: number
+          restaurant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "local_prices_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "menu_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "local_prices_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      menu_items: {
+        Row: {
+          brand_id: string | null
+          calories: number | null
+          created_at: string | null
+          default_price: number | null
+          external_ref: string | null
+          id: string
+          item_name: string
+          protein_g: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          brand_id?: string | null
+          calories?: number | null
+          created_at?: string | null
+          default_price?: number | null
+          external_ref?: string | null
+          id?: string
+          item_name: string
+          protein_g?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          brand_id?: string | null
+          calories?: number | null
+          created_at?: string | null
+          default_price?: number | null
+          external_ref?: string | null
+          id?: string
+          item_name?: string
+          protein_g?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "menu_items_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      restaurants: {
+        Row: {
+          address: string | null
+          brand_id: string | null
+          city: string | null
+          created_at: string | null
+          id: string
+          lat: number | null
+          lng: number | null
+          name: string
+          place_id: string | null
+          postal_code: string | null
+          state: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          address?: string | null
+          brand_id?: string | null
+          city?: string | null
+          created_at?: string | null
+          id?: string
+          lat?: number | null
+          lng?: number | null
+          name: string
+          place_id?: string | null
+          postal_code?: string | null
+          state?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          address?: string | null
+          brand_id?: string | null
+          city?: string | null
+          created_at?: string | null
+          id?: string
+          lat?: number | null
+          lng?: number | null
+          name?: string
+          place_id?: string | null
+          postal_code?: string | null
+          state?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "restaurants_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

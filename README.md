@@ -24,7 +24,7 @@ A smart nutrition discovery app that helps you find foods matching your macro ta
 
 ### Prerequisites
 - Node.js 18+ and npm
-- Supabase account (for database and APIs)
+- Lovable Cloud (Supabase integration already configured)
 
 ### Installation
 
@@ -41,35 +41,23 @@ A smart nutrition discovery app that helps you find foods matching your macro ta
 
 3. **Environment setup**
    ```bash
-   cp .env.example .env.local
-   # Edit .env.local with your API keys
+   cp .env.example .env
+   # Add your external API keys (Nutritionix, Yelp, Google Maps)
    ```
 
-4. **Start development server**
+4. **Database setup**
+   The database schema is already migrated via Lovable Cloud. To seed sample data:
+   ```bash
+   npm run db:seed
+   ```
+
+5. **Start development server**
    ```bash
    npm run dev
    ```
 
-5. **Open in browser**
+6. **Open in browser**
    Navigate to `http://localhost:5173`
-
-### Supabase Setup (Local Development)
-
-1. **Install Supabase CLI**
-   ```bash
-   npm install -g supabase
-   ```
-
-2. **Initialize local Supabase**
-   ```bash
-   supabase init
-   supabase start
-   ```
-
-3. **Run migrations**
-   ```bash
-   supabase db reset
-   ```
 
 ## 📁 Project Structure
 
@@ -97,7 +85,7 @@ src/
 - `npm run build` - Build for production  
 - `npm run preview` - Preview production build
 - `npm run lint` - Run ESLint
-- `npm run type-check` - Run TypeScript compiler
+- `npm run db:seed` - Seed database with sample data
 
 ## 🌐 API Integration
 
