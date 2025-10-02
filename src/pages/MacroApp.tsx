@@ -1,22 +1,26 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, MapPin } from "lucide-react";
 import ControlsPanel from "@/components/ControlsPanel";
 import ResultsTable from "@/components/ResultsTable";
 import Loader from "@/components/Loader";
 import { rankItems, type RankResult } from "@/api/rank";
 import { useToast } from "@/hooks/use-toast";
 
+const STORAGE_KEY = "macroFinder_settings";
+
 export interface MacroTargets {
   mode: "bulking" | "cutting";
   targetProtein: number;
   targetCalories: number;
-  wP: number; // protein weight
-  wC: number; // calorie weight
-  wR: number; // radius weight
+  wP: number;
+  wC: number;
+  wR: number;
   radiusKm: number;
   priceCap: number;
+  lat?: number;
+  lng?: number;
 }
 
 export interface FoodResult {
@@ -35,29 +39,78 @@ const MacroApp = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [results, setResults] = useState<FoodResult[]>([]);
   const debounceTimer = useRef<NodeJS.Timeout>();
-  
-  // Initialize state from URL params
-  const [targets, setTargets] = useState<MacroTargets>({
-    mode: (searchParams.get("mode") as "bulking" | "cutting") || "bulking",
-    targetProtein: Number(searchParams.get("targetProtein")) || 30,
-    targetCalories: Number(searchParams.get("targetCalories")) || 500,
-    wP: Number(searchParams.get("wP")) || 0.5,
-    wC: Number(searchParams.get("wC")) || 0.3,
-    wR: Number(searchParams.get("wR")) || 0.2,
-    radiusKm: Number(searchParams.get("radiusKm")) || 5,
-    priceCap: Number(searchParams.get("priceCap")) || 20,
-  });
+  const isInitialMount = useRef(true);
 
-  // Update URL when targets change
+  // Load settings from localStorage or URL params
+  const getInitialTargets = (): MacroTargets => {
+    // Priority 1: URL params
+    if (searchParams.toString()) {
+      return {
+        mode: (searchParams.get("mode") as "bulking" | "cutting") || "bulking",
+        targetProtein: Number(searchParams.get("targetProtein")) || 30,
+        targetCalories: Number(searchParams.get("targetCalories")) || 500,
+        wP: Number(searchParams.get("wP")) || 0.5,
+        wC: Number(searchParams.get("wC")) || 0.3,
+        wR: Number(searchParams.get("wR")) || 0.2,
+        radiusKm: Number(searchParams.get("radiusKm")) || 5,
+        priceCap: Number(searchParams.get("priceCap")) || 20,
+        lat: searchParams.get("lat") ? Number(searchParams.get("lat")) : undefined,
+        lng: searchParams.get("lng") ? Number(searchParams.get("lng")) : undefined,
+      };
+    }
+
+    // Priority 2: localStorage
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        return JSON.parse(stored);
+      }
+    } catch (error) {
+      console.error("Failed to load settings from localStorage:", error);
+    }
+
+    // Priority 3: defaults
+    return {
+      mode: "bulking",
+      targetProtein: 30,
+      targetCalories: 500,
+      wP: 0.5,
+      wC: 0.3,
+      wR: 0.2,
+      radiusKm: 5,
+      priceCap: 20,
+    };
+  };
+
+  const [targets, setTargets] = useState<MacroTargets>(getInitialTargets);
+
+  // Update URL and localStorage when targets change
   useEffect(() => {
     const params = new URLSearchParams();
     Object.entries(targets).forEach(([key, value]) => {
-      params.set(key, value.toString());
+      if (value !== undefined && value !== null) {
+        params.set(key, value.toString());
+      }
     });
     setSearchParams(params, { replace: true });
-  }, [targets, setSearchParams]);
+
+    // Save to localStorage
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(targets));
+    } catch (error) {
+      console.error("Failed to save settings to localStorage:", error);
+    }
+
+    // Trigger search after initial mount
+    if (!isInitialMount.current) {
+      handleSearch();
+    } else {
+      isInitialMount.current = false;
+    }
+  }, [targets]);
 
   const performSearch = useCallback(async () => {
     setIsLoading(true);
@@ -72,6 +125,8 @@ const MacroApp = () => {
         wR: targets.wR,
         radiusKm: targets.radiusKm,
         priceCap: targets.priceCap,
+        lat: targets.lat,
+        lng: targets.lng,
       });
 
       // Map to FoodResult format
@@ -119,6 +174,57 @@ const MacroApp = () => {
     }, 500);
   }, [performSearch]);
 
+  const handleLocationRequest = useCallback(() => {
+    if (!navigator.geolocation) {
+      toast({
+        title: "Geolocation not supported",
+        description: "Your browser doesn't support geolocation.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsGettingLocation(true);
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = Number(position.coords.latitude.toFixed(6));
+        const lng = Number(position.coords.longitude.toFixed(6));
+
+        setTargets((prev) => ({ ...prev, lat, lng }));
+        setIsGettingLocation(false);
+
+        toast({
+          title: "Location detected",
+          description: `Searching within ${targets.radiusKm}km of your location`,
+        });
+      },
+      (error) => {
+        setIsGettingLocation(false);
+        let message = "Failed to get your location.";
+
+        if (error.code === error.PERMISSION_DENIED) {
+          message = "Location access denied. Please enable location permissions.";
+        } else if (error.code === error.POSITION_UNAVAILABLE) {
+          message = "Location information unavailable.";
+        } else if (error.code === error.TIMEOUT) {
+          message = "Location request timed out.";
+        }
+
+        toast({
+          title: "Location error",
+          description: message,
+          variant: "destructive",
+        });
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 300000, // 5 minutes
+      }
+    );
+  }, [toast, targets.radiusKm]);
+
   // Cleanup timer on unmount
   useEffect(() => {
     return () => {
@@ -158,6 +264,8 @@ const MacroApp = () => {
               onTargetsChange={setTargets}
               onSearch={handleSearch}
               isLoading={isLoading}
+              onLocationRequest={handleLocationRequest}
+              isGettingLocation={isGettingLocation}
             />
           </div>
 

@@ -4,26 +4,66 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
-import { Search, TrendingUp, Target } from "lucide-react";
+import { Search, TrendingUp, Target, TrendingDown, DollarSign, Loader2, MapPin } from "lucide-react";
 import { MacroTargets } from "@/pages/MacroApp";
+import { useToast } from "@/hooks/use-toast";
 
 interface ControlsPanelProps {
   targets: MacroTargets;
   onTargetsChange: (targets: MacroTargets) => void;
   onSearch: () => void;
   isLoading: boolean;
+  onLocationRequest: () => void;
+  isGettingLocation: boolean;
 }
+
+const PRESETS = {
+  bulking: { wP: 2.0, wC: 0.8, wR: 0.2, label: "Bulking", icon: TrendingUp },
+  cutting: { wP: 2.5, wC: 0.3, wR: 0.4, label: "Cutting", icon: TrendingDown },
+  budget: { wP: 1.8, wC: 0.8, wR: 0.5, label: "Budget", icon: DollarSign },
+};
 
 const ControlsPanel = ({
   targets,
   onTargetsChange,
   onSearch,
   isLoading,
+  onLocationRequest,
+  isGettingLocation,
 }: ControlsPanelProps) => {
+  const { toast } = useToast();
+
   const updateTarget = (key: keyof MacroTargets, value: string | number) => {
+    let validatedValue = typeof value === "string" ? Number(value) || 0 : value;
+
+    // Validate inputs
+    if (key === 'wP' || key === 'wC' || key === 'wR') {
+      validatedValue = Math.max(0, Math.min(5, validatedValue));
+    } else if (key === 'radiusKm') {
+      validatedValue = Math.max(1, Math.min(30, validatedValue));
+    } else if (key === 'priceCap') {
+      validatedValue = Math.max(0, Math.min(100, validatedValue));
+    } else if (key === 'targetProtein' || key === 'targetCalories') {
+      validatedValue = Math.max(0, validatedValue);
+    }
+
     onTargetsChange({
       ...targets,
-      [key]: typeof value === "string" ? Number(value) || 0 : value,
+      [key]: validatedValue,
+    });
+  };
+
+  const applyPreset = (preset: keyof typeof PRESETS) => {
+    const config = PRESETS[preset];
+    onTargetsChange({
+      ...targets,
+      wP: config.wP,
+      wC: config.wC,
+      wR: config.wR,
+    });
+    toast({
+      title: `${config.label} preset applied`,
+      description: `Weights optimized for ${preset} goals`,
     });
   };
 
@@ -59,6 +99,27 @@ const ControlsPanel = ({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Preset Buttons */}
+        <div>
+          <Label className="text-sm mb-3 block">Quick Presets</Label>
+          <div className="grid grid-cols-3 gap-2">
+            {Object.entries(PRESETS).map(([key, config]) => {
+              const Icon = config.icon;
+              return (
+                <Button
+                  key={key}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => applyPreset(key as keyof typeof PRESETS)}
+                  className="flex flex-col h-auto py-3 gap-1"
+                >
+                  <Icon className="h-4 w-4" />
+                  <span className="text-xs">{config.label}</span>
+                </Button>
+              );
+            })}
+          </div>
+        </div>
         {/* Mode Selection */}
         <div className="space-y-3">
           <Label>Goal Mode</Label>
@@ -119,12 +180,12 @@ const ControlsPanel = ({
           <div>
             <div className="flex justify-between items-center mb-2">
               <Label className="text-sm">Protein Match</Label>
-              <span className="text-sm text-muted-foreground">{targets.wP}</span>
+              <span className="text-sm text-muted-foreground">{targets.wP.toFixed(1)}</span>
             </div>
             <Slider
               value={[targets.wP]}
               onValueChange={([value]) => updateTarget("wP", value)}
-              max={1}
+              max={5}
               step={0.1}
               className="w-full"
             />
@@ -133,12 +194,12 @@ const ControlsPanel = ({
           <div>
             <div className="flex justify-between items-center mb-2">
               <Label className="text-sm">Calorie Match</Label>
-              <span className="text-sm text-muted-foreground">{targets.wC}</span>
+              <span className="text-sm text-muted-foreground">{targets.wC.toFixed(1)}</span>
             </div>
             <Slider
               value={[targets.wC]}
               onValueChange={([value]) => updateTarget("wC", value)}
-              max={1}
+              max={5}
               step={0.1}
               className="w-full"
             />
@@ -146,41 +207,70 @@ const ControlsPanel = ({
           
           <div>
             <div className="flex justify-between items-center mb-2">
-              <Label className="text-sm">Distance</Label>
-              <span className="text-sm text-muted-foreground">{targets.wR}</span>
+              <Label className="text-sm">Distance/Price</Label>
+              <span className="text-sm text-muted-foreground">{targets.wR.toFixed(1)}</span>
             </div>
             <Slider
               value={[targets.wR]}
               onValueChange={([value]) => updateTarget("wR", value)}
-              max={1}
+              max={5}
               step={0.1}
               className="w-full"
             />
           </div>
+          <p className="text-xs text-muted-foreground">Range: 0-5 for all weights</p>
+        </div>
+
+        {/* Location Button */}
+        <div>
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={onLocationRequest}
+            disabled={isGettingLocation}
+          >
+            {isGettingLocation ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Getting location...
+              </>
+            ) : (
+              <>
+                <MapPin className="mr-2 h-4 w-4" />
+                Use my location
+              </>
+            )}
+          </Button>
         </div>
 
         {/* Search Parameters */}
         <div className="space-y-4">
           <div>
-            <Label htmlFor="radius">Search Radius (km)</Label>
+            <Label htmlFor="radius">Search Radius (km): {targets.radiusKm}</Label>
             <Input
               id="radius"
               type="number"
+              min="1"
+              max="30"
               value={targets.radiusKm}
               onChange={(e) => updateTarget("radiusKm", e.target.value)}
               className="mt-1"
             />
+            <p className="text-xs text-muted-foreground mt-1">Range: 1-30 km</p>
           </div>
           
           <div>
-            <Label htmlFor="priceCap">Max Price ($)</Label>
+            <Label htmlFor="priceCap">Max Price ($): {targets.priceCap}</Label>
             <Input
               id="priceCap"
               type="number"
+              min="0"
+              max="100"
               value={targets.priceCap}
               onChange={(e) => updateTarget("priceCap", e.target.value)}
               className="mt-1"
             />
+            <p className="text-xs text-muted-foreground mt-1">Range: $0-100</p>
           </div>
         </div>
 
