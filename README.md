@@ -87,6 +87,25 @@ src/
 - `npm run lint` - Run ESLint
 - `npm run db:seed` - Seed database with sample data
 
+## 🚀 Edge Functions
+
+The ranking algorithm runs as a Supabase Edge Function at `supabase/functions/rank/index.ts`.
+
+**Deployment**: Edge functions are automatically deployed with your Lovable Cloud project. No manual deployment needed!
+
+**Local Testing** (optional):
+```bash
+npx supabase functions serve rank --env-file .env
+```
+
+**Function Endpoint**: `/functions/v1/rank`
+
+**How it works**:
+1. Queries restaurants, brands, menu items, and local prices from the database
+2. Filters by location radius (Haversine distance) and price cap
+3. Calculates weighted scores based on protein/calorie targets and price
+4. Returns top-ranked results sorted by score (lower = better match)
+
 ## 🌐 API Integration
 
 The app is designed to integrate with multiple food and location APIs:

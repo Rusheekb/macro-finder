@@ -1,10 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import ControlsPanel from "@/components/ControlsPanel";
 import ResultsTable from "@/components/ResultsTable";
 import Loader from "@/components/Loader";
+import { rankItems, type RankResult } from "@/api/rank";
+import { useToast } from "@/hooks/use-toast";
 
 export interface MacroTargets {
   mode: "bulking" | "cutting";
@@ -24,15 +26,17 @@ export interface FoodResult {
   protein: number;
   calories: number;
   price: number;
-  distance: number;
+  distance?: number;
   score: number;
 }
 
 const MacroApp = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState<FoodResult[]>([]);
+  const debounceTimer = useRef<NodeJS.Timeout>();
   
   // Initialize state from URL params
   const [targets, setTargets] = useState<MacroTargets>({
@@ -55,62 +59,74 @@ const MacroApp = () => {
     setSearchParams(params, { replace: true });
   }, [targets, setSearchParams]);
 
-  const handleSearch = async () => {
+  const performSearch = useCallback(async () => {
     setIsLoading(true);
     
     try {
-      // TODO: Replace with actual API call
-      const response = await fetch("/api/rank", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(targets),
+      const rankResults = await rankItems({
+        mode: targets.mode,
+        targetProtein: targets.targetProtein,
+        targetCalories: targets.targetCalories,
+        wP: targets.wP,
+        wC: targets.wC,
+        wR: targets.wR,
+        radiusKm: targets.radiusKm,
+        priceCap: targets.priceCap,
       });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setResults(data.results || []);
+
+      // Map to FoodResult format
+      const mappedResults: FoodResult[] = rankResults.map((item) => ({
+        id: item.itemId,
+        name: item.itemName,
+        restaurant: item.restaurantName,
+        protein: item.protein,
+        calories: item.calories,
+        price: item.price,
+        distance: item.distance,
+        score: item.score,
+      }));
+
+      setResults(mappedResults);
+
+      if (mappedResults.length === 0) {
+        toast({
+          title: "No results found",
+          description: "Try adjusting your search parameters or price cap.",
+        });
       }
     } catch (error) {
       console.error("Search failed:", error);
-      // Mock data for demo
-      setResults([
-        {
-          id: "1",
-          name: "Grilled Chicken Breast",
-          restaurant: "Local Grill",
-          protein: 31,
-          calories: 165,
-          price: 12.99,
-          distance: 1.2,
-          score: 0.95,
-        },
-        {
-          id: "2",
-          name: "Salmon Fillet",
-          restaurant: "Fish Market",
-          protein: 28,
-          calories: 206,
-          price: 18.50,
-          distance: 2.1,
-          score: 0.88,
-        },
-        {
-          id: "3",
-          name: "Greek Yogurt Bowl",
-          restaurant: "Healthy Cafe",
-          protein: 20,
-          calories: 150,
-          price: 8.99,
-          distance: 0.8,
-          score: 0.82,
-        },
-      ]);
+      toast({
+        title: "Search failed",
+        description: "Unable to fetch results. Please try again.",
+        variant: "destructive",
+      });
+      setResults([]);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [targets, toast]);
+
+  const handleSearch = useCallback(() => {
+    // Clear existing timer
+    if (debounceTimer.current) {
+      clearTimeout(debounceTimer.current);
+    }
+
+    // Set new timer for debounced search
+    debounceTimer.current = setTimeout(() => {
+      performSearch();
+    }, 500);
+  }, [performSearch]);
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimer.current) {
+        clearTimeout(debounceTimer.current);
+      }
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-background">
