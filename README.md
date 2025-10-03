@@ -18,7 +18,7 @@ A smart nutrition discovery app that helps you find foods matching your macro ta
 - **Styling**: Tailwind CSS + shadcn/ui components  
 - **Routing**: React Router v6 with URL state management
 - **Backend**: Supabase (database + auth + edge functions)
-- **APIs**: Nutritionix, Yelp, Google Maps integration ready
+- **APIs**: OpenStreetMap Overpass API for restaurant discovery
 
 ## 🚀 Quick Start
 
@@ -89,16 +89,9 @@ src/
 
 ## 🚀 Edge Functions
 
+### Rank Function (`/functions/v1/rank`)
+
 The ranking algorithm runs as a Supabase Edge Function at `supabase/functions/rank/index.ts`.
-
-**Deployment**: Edge functions are automatically deployed with your Lovable Cloud project. No manual deployment needed!
-
-**Local Testing** (optional):
-```bash
-npx supabase functions serve rank --env-file .env
-```
-
-**Function Endpoint**: `/functions/v1/rank`
 
 **How it works**:
 1. Queries restaurants, brands, menu items, and local prices from the database
@@ -106,21 +99,29 @@ npx supabase functions serve rank --env-file .env
 3. Calculates weighted scores based on protein/calorie targets and price
 4. Returns top-ranked results sorted by score (lower = better match)
 
-## 🌐 API Integration
+### Nearby Function (`/functions/v1/nearby`)
 
-The app is designed to integrate with multiple food and location APIs:
+Discovers and upserts nearby restaurants using OpenStreetMap data at `supabase/functions/nearby/index.ts`.
 
-### Nutritionix API
-- Comprehensive food nutrition database
-- Restaurant menu items and nutritional data
+**How it works**:
+1. Uses OpenStreetMap Overpass API to find restaurants within specified radius
+2. Filters for supported chains (McDonald's, Chipotle, Wingstop)
+3. Maps OSM data to database brands and restaurants
+4. Upserts restaurants with location, address, and brand information
+5. Returns list of discovered restaurants
 
-### Yelp Fusion API  
-- Restaurant locations and details
-- Reviews, ratings, and contact info
+**Data Attribution**: Restaurant location data © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright)
 
-### Google Maps API
-- Distance calculations between user and restaurants
-- Geocoding for address lookups
+**Deployment**: Edge functions are automatically deployed with your Lovable Cloud project. No manual deployment needed!
+
+## 🌐 Data Sources
+
+### OpenStreetMap Overpass API
+- Free, open-source restaurant location data
+- Real-time discovery of nearby restaurants
+- No API key required
+- Data licensed under [ODbL](https://opendatacommons.org/licenses/odbl/)
+- Attribution: © OpenStreetMap contributors
 
 ## 📊 Scoring Algorithm
 

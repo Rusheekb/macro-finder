@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
-import { Search, TrendingUp, Target, TrendingDown, DollarSign, Loader2, MapPin } from "lucide-react";
+import { Search, TrendingUp, Target, TrendingDown, DollarSign, Loader2, MapPin, RefreshCw } from "lucide-react";
 import { MacroTargets } from "@/pages/MacroApp";
 import { useToast } from "@/hooks/use-toast";
 
@@ -15,6 +15,8 @@ interface ControlsPanelProps {
   isLoading: boolean;
   onLocationRequest: () => void;
   isGettingLocation: boolean;
+  onRefreshNearby: () => void;
+  isRefreshingNearby: boolean;
 }
 
 const PRESETS = {
@@ -30,6 +32,8 @@ const ControlsPanel = ({
   isLoading,
   onLocationRequest,
   isGettingLocation,
+  onRefreshNearby,
+  isRefreshingNearby,
 }: ControlsPanelProps) => {
   const { toast } = useToast();
 
@@ -221,8 +225,8 @@ const ControlsPanel = ({
           <p className="text-xs text-muted-foreground">Range: 0-5 for all weights</p>
         </div>
 
-        {/* Location Button */}
-        <div>
+        {/* Location Buttons */}
+        <div className="space-y-2">
           <Button
             variant="outline"
             className="w-full"
@@ -238,6 +242,25 @@ const ControlsPanel = ({
               <>
                 <MapPin className="mr-2 h-4 w-4" />
                 Use my location
+              </>
+            )}
+          </Button>
+
+          <Button
+            variant="secondary"
+            className="w-full"
+            onClick={onRefreshNearby}
+            disabled={isRefreshingNearby}
+          >
+            {isRefreshingNearby ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Discovering restaurants...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Refresh Nearby
               </>
             )}
           </Button>

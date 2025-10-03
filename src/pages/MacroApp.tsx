@@ -7,6 +7,7 @@ import ResultsTable from "@/components/ResultsTable";
 import Loader from "@/components/Loader";
 import { rankItems, type RankResult } from "@/api/rank";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const STORAGE_KEY = "macroFinder_settings";
 
@@ -40,6 +41,7 @@ const MacroApp = () => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
+  const [isRefreshingNearby, setIsRefreshingNearby] = useState(false);
   const [results, setResults] = useState<FoodResult[]>([]);
   const debounceTimer = useRef<NodeJS.Timeout>();
   const isInitialMount = useRef(true);
@@ -225,6 +227,81 @@ const MacroApp = () => {
     );
   }, [toast, targets.radiusKm]);
 
+  const handleRefreshNearby = useCallback(async () => {
+    if (!navigator.geolocation) {
+      toast({
+        title: "Geolocation not supported",
+        description: "Your browser doesn't support geolocation.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsRefreshingNearby(true);
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const lat = Number(position.coords.latitude.toFixed(6));
+        const lng = Number(position.coords.longitude.toFixed(6));
+
+        try {
+          toast({
+            title: "Discovering nearby restaurants",
+            description: "Fetching restaurants from OpenStreetMap...",
+          });
+
+          const { data, error } = await supabase.functions.invoke('nearby', {
+            body: { lat, lng, radiusKm: targets.radiusKm },
+          });
+
+          if (error) throw error;
+
+          const count = data?.count || 0;
+          toast({
+            title: "Restaurants updated",
+            description: `Found ${count} restaurant${count !== 1 ? 's' : ''} nearby`,
+          });
+
+          // Update location and trigger search
+          setTargets((prev) => ({ ...prev, lat, lng }));
+          
+        } catch (error) {
+          console.error('Refresh nearby failed:', error);
+          toast({
+            title: "Refresh failed",
+            description: "Unable to fetch nearby restaurants. Please try again.",
+            variant: "destructive",
+          });
+        } finally {
+          setIsRefreshingNearby(false);
+        }
+      },
+      (error) => {
+        setIsRefreshingNearby(false);
+        let message = "Failed to get your location.";
+
+        if (error.code === error.PERMISSION_DENIED) {
+          message = "Location access denied. Please enable location permissions.";
+        } else if (error.code === error.POSITION_UNAVAILABLE) {
+          message = "Location information unavailable.";
+        } else if (error.code === error.TIMEOUT) {
+          message = "Location request timed out.";
+        }
+
+        toast({
+          title: "Location error",
+          description: message,
+          variant: "destructive",
+        });
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 300000,
+      }
+    );
+  }, [toast, targets.radiusKm, supabase]);
+
   // Cleanup timer on unmount
   useEffect(() => {
     return () => {
@@ -266,6 +343,8 @@ const MacroApp = () => {
               isLoading={isLoading}
               onLocationRequest={handleLocationRequest}
               isGettingLocation={isGettingLocation}
+              onRefreshNearby={handleRefreshNearby}
+              isRefreshingNearby={isRefreshingNearby}
             />
           </div>
 

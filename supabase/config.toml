@@ -1,1 +1,7 @@
 project_id = "jitsslwweidvderlgvzv"
+
+[functions.rank]
+verify_jwt = false
+
+[functions.nearby]
+verify_jwt = false

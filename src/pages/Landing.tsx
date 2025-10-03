@@ -139,6 +139,15 @@ const Landing = () => {
           </p>
         </div>
       </div>
+
+      {/* Footer */}
+      <footer className="container mx-auto px-4 py-8 border-t">
+        <p className="text-center text-muted-foreground text-sm">
+          © 2024 MacroFinder. Built with React, TypeScript, and Tailwind CSS.
+          <br />
+          Restaurant data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">OpenStreetMap contributors</a>
+        </p>
+      </footer>
     </div>
   );
 };
