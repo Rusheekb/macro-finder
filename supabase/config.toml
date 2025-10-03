@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.nearby]
 verify_jwt = false
+
+[functions.import_nutritionix]
+verify_jwt = false
