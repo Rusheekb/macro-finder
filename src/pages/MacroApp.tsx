@@ -26,6 +26,8 @@ export interface MacroTargets {
 
 export interface FoodResult {
   id: string;
+  restaurantId: string;
+  itemId: string;
   name: string;
   restaurant: string;
   protein: number;
@@ -33,6 +35,7 @@ export interface FoodResult {
   price: number;
   distance?: number;
   score: number;
+  priceUpdatedAt?: string;
 }
 
 const MacroApp = () => {
@@ -134,6 +137,8 @@ const MacroApp = () => {
       // Map to FoodResult format
       const mappedResults: FoodResult[] = rankResults.map((item) => ({
         id: item.itemId,
+        restaurantId: item.restaurantId,
+        itemId: item.itemId,
         name: item.itemName,
         restaurant: item.restaurantName,
         protein: item.protein,
@@ -141,6 +146,7 @@ const MacroApp = () => {
         price: item.price,
         distance: item.distance,
         score: item.score,
+        priceUpdatedAt: item.priceUpdatedAt,
       }));
 
       setResults(mappedResults);
@@ -353,7 +359,10 @@ const MacroApp = () => {
             {isLoading ? (
               <Loader />
             ) : (
-              <ResultsTable results={results} />
+              <ResultsTable 
+                results={results} 
+                onPriceUpdate={handleSearch}
+              />
             )}
           </div>
         </div>

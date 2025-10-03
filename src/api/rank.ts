@@ -28,6 +28,7 @@ export interface RankResult {
   lat: number | null;
   lng: number | null;
   distance?: number;
+  priceUpdatedAt?: string;
 }
 
 export const rankItems = async (request: RankRequest): Promise<RankResult[]> => {

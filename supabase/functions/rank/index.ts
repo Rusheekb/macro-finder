@@ -95,7 +95,8 @@ Deno.serve(async (req) => {
           protein_g,
           default_price,
           local_prices (
-            price
+            price,
+            updated_at
           )
         )
       `);
@@ -127,6 +128,7 @@ Deno.serve(async (req) => {
       lat: number | null;
       lng: number | null;
       distance?: number;
+      priceUpdatedAt?: string;
     }> = [];
 
     for (const restaurant of items) {
@@ -151,6 +153,7 @@ Deno.serve(async (req) => {
         // Determine price: local override or default
         const localPrices = item.local_prices as any[];
         const price = localPrices?.[0]?.price ?? item.default_price;
+        const priceUpdatedAt = localPrices?.[0]?.updated_at;
 
         // Skip if no valid price
         if (!price || price <= 0) {
@@ -189,6 +192,7 @@ Deno.serve(async (req) => {
           lat: restaurant.lat,
           lng: restaurant.lng,
           ...(distance !== undefined && { distance: Number(distance.toFixed(2)) }),
+          ...(priceUpdatedAt && { priceUpdatedAt }),
         });
       }
     }

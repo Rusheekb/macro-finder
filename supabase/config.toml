@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.import_nutritionix]
 verify_jwt = false
+
+[functions.set_price]
+verify_jwt = false
