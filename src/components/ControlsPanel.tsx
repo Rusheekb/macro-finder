@@ -4,9 +4,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
-import { Search, TrendingUp, Target, TrendingDown, DollarSign, Loader2, MapPin, RefreshCw } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Search, TrendingUp, Target, TrendingDown, DollarSign, Loader2, MapPin, RefreshCw, Filter } from "lucide-react";
 import { MacroTargets } from "@/pages/MacroApp";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useState, useEffect } from "react";
 
 interface ControlsPanelProps {
   targets: MacroTargets;
@@ -36,6 +39,25 @@ const ControlsPanel = ({
   isRefreshingNearby,
 }: ControlsPanelProps) => {
   const { toast } = useToast();
+  const [brands, setBrands] = useState<Array<{ chain_key: string; display_name: string }>>([]);
+
+  // Fetch brands on mount
+  useEffect(() => {
+    const fetchBrands = async () => {
+      const { data, error } = await supabase
+        .from('brands')
+        .select('chain_key, display_name')
+        .order('display_name');
+      
+      if (error) {
+        console.error('Failed to fetch brands:', error);
+      } else {
+        setBrands(data || []);
+      }
+    };
+    
+    fetchBrands();
+  }, []);
 
   const updateTarget = (key: keyof MacroTargets, value: string | number) => {
     let validatedValue = typeof value === "string" ? Number(value) || 0 : value;
@@ -88,6 +110,18 @@ const ControlsPanel = ({
     }
     
     onTargetsChange(newTargets);
+  };
+
+  const toggleBrand = (brandKey: string) => {
+    const currentExcluded = targets.excludeBrands || [];
+    const isExcluded = currentExcluded.includes(brandKey);
+    
+    onTargetsChange({
+      ...targets,
+      excludeBrands: isExcluded
+        ? currentExcluded.filter(b => b !== brandKey)
+        : [...currentExcluded, brandKey],
+    });
   };
 
   return (
@@ -266,6 +300,76 @@ const ControlsPanel = ({
           </Button>
         </div>
 
+        {/* Filters Section */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4" />
+            <Label className="text-base font-semibold">Filters</Label>
+          </div>
+
+          <div>
+            <div className="flex justify-between items-center mb-2">
+              <Label htmlFor="priceCap">Max Price</Label>
+              <span className="text-sm text-muted-foreground">${targets.priceCap}</span>
+            </div>
+            <Slider
+              id="priceCap"
+              value={[targets.priceCap]}
+              onValueChange={([value]) => updateTarget("priceCap", value)}
+              min={0}
+              max={30}
+              step={0.5}
+              className="w-full"
+            />
+            <p className="text-xs text-muted-foreground mt-1">$0 - $30</p>
+          </div>
+
+          <div>
+            <Label htmlFor="minProtein">Minimum Protein (g)</Label>
+            <Input
+              id="minProtein"
+              type="number"
+              min="0"
+              value={targets.minProtein || ""}
+              onChange={(e) => {
+                const value = e.target.value === "" ? undefined : Number(e.target.value);
+                onTargetsChange({ ...targets, minProtein: value });
+              }}
+              placeholder="Optional"
+              className="mt-1"
+            />
+            <p className="text-xs text-muted-foreground mt-1">Filter items below this protein amount</p>
+          </div>
+
+          <div>
+            <Label>Exclude Brands</Label>
+            <div className="mt-2 max-h-40 overflow-y-auto space-y-2 border rounded-md p-2">
+              {brands.length === 0 ? (
+                <p className="text-xs text-muted-foreground">Loading brands...</p>
+              ) : (
+                brands.map((brand) => (
+                  <div key={brand.chain_key} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`brand-${brand.chain_key}`}
+                      checked={targets.excludeBrands?.includes(brand.chain_key) || false}
+                      onCheckedChange={() => toggleBrand(brand.chain_key)}
+                    />
+                    <label
+                      htmlFor={`brand-${brand.chain_key}`}
+                      className="text-sm cursor-pointer"
+                    >
+                      {brand.display_name}
+                    </label>
+                  </div>
+                ))
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {targets.excludeBrands?.length || 0} brand{targets.excludeBrands?.length !== 1 ? 's' : ''} excluded
+            </p>
+          </div>
+        </div>
+
         {/* Search Parameters */}
         <div className="space-y-4">
           <div>
@@ -280,20 +384,6 @@ const ControlsPanel = ({
               className="mt-1"
             />
             <p className="text-xs text-muted-foreground mt-1">Range: 1-30 km</p>
-          </div>
-          
-          <div>
-            <Label htmlFor="priceCap">Max Price ($): {targets.priceCap}</Label>
-            <Input
-              id="priceCap"
-              type="number"
-              min="0"
-              max="100"
-              value={targets.priceCap}
-              onChange={(e) => updateTarget("priceCap", e.target.value)}
-              className="mt-1"
-            />
-            <p className="text-xs text-muted-foreground mt-1">Range: $0-100</p>
           </div>
         </div>
 

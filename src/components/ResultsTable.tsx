@@ -5,7 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowUpDown, Star, MapPin, DollarSign, Utensils, Edit, Loader2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ArrowUpDown, Star, MapPin, DollarSign, Utensils, Edit, Loader2, Download, ArrowUp, ArrowDown } from "lucide-react";
 import { FoodResult } from "@/pages/MacroApp";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -99,11 +100,45 @@ const ResultsTable = ({ results, onPriceUpdate }: ResultsTableProps) => {
   };
 
   const sortedResults = [...results].sort((a, b) => {
-    const aValue = a[sortField];
-    const bValue = b[sortField];
+    const aValue = a[sortField] ?? 0;
+    const bValue = b[sortField] ?? 0;
     const multiplier = sortDirection === "asc" ? 1 : -1;
     return (aValue - bValue) * multiplier;
   });
+
+  const exportToCSV = () => {
+    const headers = ['Rank', 'Food', 'Restaurant', 'Protein (g)', 'Calories', 'Price ($)', 'Distance (km)', 'Score (%)'];
+    const rows = sortedResults.map((result, index) => [
+      index + 1,
+      result.name,
+      result.restaurant,
+      result.protein,
+      result.calories,
+      result.price.toFixed(2),
+      result.distance?.toFixed(1) ?? 'N/A',
+      Math.round(result.score * 100),
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(',')),
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `macrofinder-results-${new Date().toISOString().slice(0, 10)}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    toast({
+      title: "Export successful",
+      description: `Exported ${sortedResults.length} results to CSV`,
+    });
+  };
 
   const SortButton = ({ field, children }: { field: SortField; children: React.ReactNode }) => (
     <Button
@@ -155,12 +190,60 @@ const ResultsTable = ({ results, onPriceUpdate }: ResultsTableProps) => {
     <>
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Star className="h-5 w-5 text-primary" />
-            Food Results ({results.length})
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Star className="h-5 w-5 text-primary" />
+              Food Results ({results.length})
+            </CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={exportToCSV}
+              className="flex items-center gap-2"
+            >
+              <Download className="h-4 w-4" />
+              Export CSV
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
+          {/* Sort Controls */}
+          <div className="flex items-center gap-4 mb-4 pb-4 border-b">
+            <Label className="text-sm font-semibold">Sort by:</Label>
+            <Select
+              value={sortField}
+              onValueChange={(value) => setSortField(value as SortField)}
+            >
+              <SelectTrigger className="w-[160px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="score">Score</SelectItem>
+                <SelectItem value="price">Price</SelectItem>
+                <SelectItem value="protein">Protein</SelectItem>
+                <SelectItem value="calories">Calories</SelectItem>
+                <SelectItem value="distance">Distance</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSortDirection(sortDirection === "asc" ? "desc" : "asc")}
+              className="flex items-center gap-2"
+            >
+              {sortDirection === "asc" ? (
+                <>
+                  <ArrowUp className="h-4 w-4" />
+                  Ascending
+                </>
+              ) : (
+                <>
+                  <ArrowDown className="h-4 w-4" />
+                  Descending
+                </>
+              )}
+            </Button>
+          </div>
           {/* Desktop Table */}
           <div className="hidden md:block overflow-x-auto">
             <table className="w-full">

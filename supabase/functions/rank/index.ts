@@ -12,6 +12,8 @@ interface RankRequest {
   priceCap?: number | null;
   targetProtein?: number | null;
   targetCalories?: number | null;
+  minProtein?: number | null;
+  excludeBrands?: string[];
   wP: number;
   wC: number;
   wR: number;
@@ -150,6 +152,16 @@ Deno.serve(async (req) => {
       const menuItems = restaurant.menu_items as any[];
 
       for (const item of menuItems) {
+        // Apply minProtein filter
+        if (body.minProtein !== null && body.minProtein !== undefined && item.protein_g < body.minProtein) {
+          continue;
+        }
+
+        // Apply excludeBrands filter
+        if (body.excludeBrands && body.excludeBrands.length > 0 && body.excludeBrands.includes(brand.chain_key)) {
+          continue;
+        }
+
         // Determine price: local override or default
         const localPrices = item.local_prices as any[];
         const price = localPrices?.[0]?.price ?? item.default_price;

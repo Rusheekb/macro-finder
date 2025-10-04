@@ -20,6 +20,8 @@ export interface MacroTargets {
   wR: number;
   radiusKm: number;
   priceCap: number;
+  minProtein?: number;
+  excludeBrands?: string[];
   lat?: number;
   lng?: number;
 }
@@ -130,6 +132,8 @@ const MacroApp = () => {
         wR: targets.wR,
         radiusKm: targets.radiusKm,
         priceCap: targets.priceCap,
+        minProtein: targets.minProtein,
+        excludeBrands: targets.excludeBrands,
         lat: targets.lat,
         lng: targets.lng,
       });
