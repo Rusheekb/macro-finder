@@ -78,8 +78,8 @@ Deno.serve(async (req) => {
     
     console.log('Rank request:', { ...body, wP, wC, wR, radiusKm, limit });
 
-    // Query: join restaurants → brands → menu_items, left join local_prices
-    const { data: items, error } = await supabase
+    // Query restaurants with their brands
+    const { data: restaurants, error: restaurantsError } = await supabase
       .from('restaurants')
       .select(`
         id,
@@ -88,31 +88,59 @@ Deno.serve(async (req) => {
         lng,
         brand_id,
         brands!inner (
-          chain_key
-        ),
-        menu_items!inner (
           id,
-          item_name,
-          calories,
-          protein_g,
-          default_price,
-          local_prices (
-            price,
-            updated_at
-          )
+          chain_key
         )
       `);
 
-    if (error) {
-      console.error('Database error:', error);
-      throw error;
+    if (restaurantsError) {
+      console.error('Database error (restaurants):', restaurantsError);
+      throw restaurantsError;
     }
 
-    if (!items || items.length === 0) {
+    if (!restaurants || restaurants.length === 0) {
+      console.log('No restaurants found');
       return new Response(
         JSON.stringify([]),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // Query all menu items
+    const { data: menuItems, error: menuItemsError } = await supabase
+      .from('menu_items')
+      .select('id, brand_id, item_name, calories, protein_g, default_price');
+
+    if (menuItemsError) {
+      console.error('Database error (menu_items):', menuItemsError);
+      throw menuItemsError;
+    }
+
+    // Get local prices for all restaurants
+    const restaurantIds = restaurants.map((r: any) => r.id);
+    const { data: localPrices } = await supabase
+      .from('local_prices')
+      .select('restaurant_id, item_id, price, updated_at')
+      .in('restaurant_id', restaurantIds);
+
+    // Create price lookup map
+    const priceMap = new Map<string, { price: number; updated_at: string }>();
+    if (localPrices) {
+      localPrices.forEach((lp: any) => {
+        const key = `${lp.restaurant_id}_${lp.item_id}`;
+        priceMap.set(key, { price: lp.price, updated_at: lp.updated_at });
+      });
+    }
+
+    // Create menu items by brand lookup
+    const menuItemsByBrand = new Map<string, any[]>();
+    if (menuItems) {
+      menuItems.forEach((item: any) => {
+        if (!menuItemsByBrand.has(item.brand_id)) {
+          menuItemsByBrand.set(item.brand_id, []);
+        }
+        menuItemsByBrand.get(item.brand_id)!.push(item);
+      });
     }
 
     // Flatten and process results
@@ -133,7 +161,7 @@ Deno.serve(async (req) => {
       priceUpdatedAt?: string;
     }> = [];
 
-    for (const restaurant of items) {
+    for (const restaurant of restaurants) {
       // Skip if location filtering is enabled but restaurant has no coordinates
       if (body.lat !== undefined && body.lng !== undefined && (!restaurant.lat || !restaurant.lng)) {
         continue;
@@ -149,9 +177,9 @@ Deno.serve(async (req) => {
       }
 
       const brand = restaurant.brands as any;
-      const menuItems = restaurant.menu_items as any[];
+      const brandMenuItems = menuItemsByBrand.get(restaurant.brand_id) || [];
 
-      for (const item of menuItems) {
+      for (const item of brandMenuItems) {
         // Apply minProtein filter
         if (body.minProtein !== null && body.minProtein !== undefined && item.protein_g < body.minProtein) {
           continue;
@@ -163,9 +191,10 @@ Deno.serve(async (req) => {
         }
 
         // Determine price: local override or default
-        const localPrices = item.local_prices as any[];
-        const price = localPrices?.[0]?.price ?? item.default_price;
-        const priceUpdatedAt = localPrices?.[0]?.updated_at;
+        const priceKey = `${restaurant.id}_${item.id}`;
+        const localPrice = priceMap.get(priceKey);
+        const price = localPrice?.price ?? item.default_price;
+        const priceUpdatedAt = localPrice?.updated_at;
 
         // Skip if no valid price
         if (!price || price <= 0) {

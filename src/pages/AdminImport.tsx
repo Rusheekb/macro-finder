@@ -48,6 +48,35 @@ const AdminImport = () => {
     }
   };
 
+  const handleSeedSample = async () => {
+    setIsLoading(true);
+    try {
+      toast({
+        title: "Seeding sample data",
+        description: "Adding demo restaurants and menu items...",
+      });
+
+      const { data, error } = await supabase.functions.invoke('seed_sample');
+
+      if (error) throw error;
+
+      toast({
+        title: "Sample data seeded successfully",
+        description: `Added ${data.brands} brands, ${data.restaurants} restaurants, and ${data.menuItems} menu items.`,
+      });
+
+    } catch (error) {
+      console.error('Seed failed:', error);
+      toast({
+        title: "Seed failed",
+        description: error.message || "Unable to seed sample data. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleImport = async () => {
     if (!selectedBrand) {
       toast({
@@ -117,7 +146,40 @@ const AdminImport = () => {
           </div>
         </div>
 
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-2xl mx-auto space-y-6">
+          {/* Seed Sample Data Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Seed Sample Data</CardTitle>
+              <CardDescription>
+                Quickly populate the database with demo restaurants and menu items
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                This will add sample data for 5 brands, 16 restaurants around Los Angeles,
+                and 26 menu items with realistic nutrition data and pricing.
+              </p>
+              <Button
+                onClick={handleSeedSample}
+                disabled={isLoading}
+                size="lg"
+                className="w-full"
+                variant="default"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Seeding...
+                  </>
+                ) : (
+                  'Seed Demo Data'
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Import from Nutritionix Card */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
