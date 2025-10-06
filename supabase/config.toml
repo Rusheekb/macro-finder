@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.db_status]
 verify_jwt = false
+
+[functions.seed_demo]
+verify_jwt = false

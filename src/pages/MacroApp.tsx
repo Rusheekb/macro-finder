@@ -56,6 +56,7 @@ const MacroApp = () => {
     localPriceCount: number;
     projectRef: string;
   } | null>(null);
+  const [isLoadingDemo, setIsLoadingDemo] = useState(false);
   const debounceTimer = useRef<NodeJS.Timeout>();
   const isInitialMount = useRef(true);
 
@@ -208,6 +209,38 @@ const MacroApp = () => {
       performSearch();
     }, 500);
   }, [performSearch]);
+
+  const handleLoadDemoData = useCallback(async () => {
+    setIsLoadingDemo(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('seed_demo');
+      
+      if (error) throw error;
+
+      toast({
+        title: "Demo data loaded",
+        description: `Inserted ${data.inserted.brands} brands, ${data.inserted.menuItems} items, ${data.inserted.restaurants} restaurants`,
+      });
+
+      // Refresh db status
+      const { data: statusData } = await supabase.functions.invoke('db_status');
+      if (statusData) {
+        setDbStatus(statusData);
+      }
+
+      // Trigger a new search
+      performSearch();
+    } catch (error) {
+      console.error('Failed to load demo data:', error);
+      toast({
+        title: "Failed to load demo data",
+        description: error.message || "Please try again",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingDemo(false);
+    }
+  }, [toast, performSearch]);
 
   const handleLocationRequest = useCallback(() => {
     if (!navigator.geolocation) {
@@ -398,20 +431,32 @@ const MacroApp = () => {
         {dbStatus && (
           <div className="fixed bottom-4 right-4 z-50">
             {dbStatus.brandCount === 0 || dbStatus.restaurantCount === 0 || dbStatus.itemCount === 0 ? (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="flex items-center gap-2 bg-yellow-500/90 text-yellow-950 px-3 py-2 rounded-lg shadow-lg text-sm font-medium">
-                      <AlertTriangle className="h-4 w-4" />
-                      <span>No seed data found</span>
-                      <span className="text-xs opacity-70 ml-1">({dbStatus.projectRef.slice(0, 6)})</span>
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Click 'Load demo data' to insert sample chains/items.</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <div className="flex flex-col gap-2 items-end">
+                {import.meta.env.VITE_ALLOW_DEMO_SEED === 'true' && (
+                  <Button
+                    onClick={handleLoadDemoData}
+                    disabled={isLoadingDemo}
+                    size="sm"
+                    className="shadow-lg"
+                  >
+                    {isLoadingDemo ? 'Loading...' : 'Load demo data'}
+                  </Button>
+                )}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="flex items-center gap-2 bg-yellow-500/90 text-yellow-950 px-3 py-2 rounded-lg shadow-lg text-sm font-medium">
+                        <AlertTriangle className="h-4 w-4" />
+                        <span>No seed data found</span>
+                        <span className="text-xs opacity-70 ml-1">({dbStatus.projectRef.slice(0, 6)})</span>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Click 'Load demo data' to insert sample chains/items.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
             ) : (
               <div className="bg-muted/80 px-3 py-2 rounded-lg shadow text-xs text-muted-foreground">
                 DB: {dbStatus.projectRef.slice(0, 6)}
