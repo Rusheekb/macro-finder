@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, MapPin } from "lucide-react";
+import { ArrowLeft, MapPin, AlertTriangle } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import ControlsPanel from "@/components/ControlsPanel";
 import ResultsTable from "@/components/ResultsTable";
 import Loader from "@/components/Loader";
@@ -48,6 +49,13 @@ const MacroApp = () => {
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [isRefreshingNearby, setIsRefreshingNearby] = useState(false);
   const [results, setResults] = useState<FoodResult[]>([]);
+  const [dbStatus, setDbStatus] = useState<{
+    brandCount: number;
+    restaurantCount: number;
+    itemCount: number;
+    localPriceCount: number;
+    projectRef: string;
+  } | null>(null);
   const debounceTimer = useRef<NodeJS.Timeout>();
   const isInitialMount = useRef(true);
 
@@ -93,6 +101,21 @@ const MacroApp = () => {
   };
 
   const [targets, setTargets] = useState<MacroTargets>(getInitialTargets);
+
+  // Fetch database status on mount
+  useEffect(() => {
+    const fetchDbStatus = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('db_status');
+        if (!error && data) {
+          setDbStatus(data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch db status:', error);
+      }
+    };
+    fetchDbStatus();
+  }, []);
 
   // Update URL and localStorage when targets change
   useEffect(() => {
@@ -370,6 +393,32 @@ const MacroApp = () => {
             )}
           </div>
         </div>
+
+        {/* Database Status Badge */}
+        {dbStatus && (
+          <div className="fixed bottom-4 right-4 z-50">
+            {dbStatus.brandCount === 0 || dbStatus.restaurantCount === 0 || dbStatus.itemCount === 0 ? (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center gap-2 bg-yellow-500/90 text-yellow-950 px-3 py-2 rounded-lg shadow-lg text-sm font-medium">
+                      <AlertTriangle className="h-4 w-4" />
+                      <span>No seed data found</span>
+                      <span className="text-xs opacity-70 ml-1">({dbStatus.projectRef.slice(0, 6)})</span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Click 'Load demo data' to insert sample chains/items.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            ) : (
+              <div className="bg-muted/80 px-3 py-2 rounded-lg shadow text-xs text-muted-foreground">
+                DB: {dbStatus.projectRef.slice(0, 6)}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
