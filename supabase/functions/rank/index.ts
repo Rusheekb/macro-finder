@@ -19,9 +19,10 @@ interface RankRequest {
   wR: number;
   mode: 'bulking' | 'cutting';
   limit?: number;
+  debug?: boolean;
 }
 
-interface RestaurantItem {
+interface RawItem {
   restaurant_id: string;
   restaurant_name: string;
   brand_key: string;
@@ -75,11 +76,12 @@ Deno.serve(async (req) => {
     const wC = clamp(body.wC, 0, 5);
     const wR = clamp(body.wR, 0, 5);
     const mode = body.mode || 'bulking';
+    const debug = body.debug ?? false;
     
-    console.log('Rank request:', { ...body, wP, wC, wR, radiusKm, limit });
+    console.log('Rank request:', { ...body, wP, wC, wR, radiusKm, limit, debug });
 
-    // Query restaurants with their brands
-    const { data: restaurants, error: restaurantsError } = await supabase
+    // Build SQL query with coalesce for price resilience
+    let query = supabase
       .from('restaurants')
       .select(`
         id,
@@ -93,17 +95,11 @@ Deno.serve(async (req) => {
         )
       `);
 
+    const { data: restaurants, error: restaurantsError } = await query;
+
     if (restaurantsError) {
       console.error('Database error (restaurants):', restaurantsError);
       throw restaurantsError;
-    }
-
-    if (!restaurants || restaurants.length === 0) {
-      console.log('No restaurants found');
-      return new Response(
-        JSON.stringify([]),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
     }
 
     // Query all menu items
@@ -117,11 +113,31 @@ Deno.serve(async (req) => {
     }
 
     // Get local prices for all restaurants
-    const restaurantIds = restaurants.map((r: any) => r.id);
-    const { data: localPrices } = await supabase
-      .from('local_prices')
-      .select('restaurant_id, item_id, price, updated_at')
-      .in('restaurant_id', restaurantIds);
+    const restaurantIds = restaurants?.map((r: any) => r.id) || [];
+    const { data: localPrices } = restaurantIds.length > 0
+      ? await supabase
+          .from('local_prices')
+          .select('restaurant_id, item_id, price, updated_at')
+          .in('restaurant_id', restaurantIds)
+      : { data: [] };
+
+    // Debug counts
+    const brandCount = new Set(restaurants?.map((r: any) => r.brand_id) || []).size;
+    const restaurantCount = restaurants?.length || 0;
+    const itemCount = menuItems?.length || 0;
+
+    console.log(`Database counts: brands=${brandCount}, restaurants=${restaurantCount}, items=${itemCount}`);
+
+    if (!restaurants || restaurants.length === 0) {
+      console.log('No restaurants found');
+      const emptyResult = debug 
+        ? { rows: [], debug: { brandCount: 0, restaurantCount: 0, itemCount: 0 } }
+        : [];
+      return new Response(
+        JSON.stringify(emptyResult),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Create price lookup map
     const priceMap = new Map<string, { price: number; updated_at: string }>();
@@ -190,18 +206,13 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Determine price: local override or default
+        // Determine price using coalesce logic: local_price OR default_price OR 9.99
         const priceKey = `${restaurant.id}_${item.id}`;
         const localPrice = priceMap.get(priceKey);
-        const price = localPrice?.price ?? item.default_price;
+        const price = localPrice?.price ?? item.default_price ?? 9.99;
         const priceUpdatedAt = localPrice?.updated_at;
 
-        // Skip if no valid price
-        if (!price || price <= 0) {
-          continue;
-        }
-
-        // Apply price cap filter
+        // Apply price cap filter (but don't drop rows with valid prices)
         if (body.priceCap !== null && body.priceCap !== undefined && price > body.priceCap) {
           continue;
         }
@@ -249,14 +260,21 @@ Deno.serve(async (req) => {
 
     console.log(`Returning ${topResults.length} results out of ${results.length} total`);
 
+    const responseData = debug 
+      ? { rows: topResults, debug: { brandCount, restaurantCount, itemCount } }
+      : topResults;
+
     return new Response(
-      JSON.stringify(topResults),
+      JSON.stringify(responseData),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
     console.error('Error in rank function:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message || 'Internal server error',
+        details: error.toString()
+      }),
       { 
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }

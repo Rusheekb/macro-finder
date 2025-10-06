@@ -14,6 +14,7 @@ export interface RankRequest {
   lat?: number;
   lng?: number;
   limit?: number;
+  debug?: boolean;
 }
 
 export interface RankResult {
@@ -36,7 +37,7 @@ export interface RankResult {
 export const rankItems = async (request: RankRequest): Promise<RankResult[]> => {
   try {
     const { data, error } = await supabase.functions.invoke('rank', {
-      body: request,
+      body: { ...request, debug: false },
     });
 
     if (error) {
