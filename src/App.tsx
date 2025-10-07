@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Landing from "./pages/Landing";
 import MacroApp from "./pages/MacroApp";
 import AdminImport from "./pages/AdminImport";
+import AdminBrandImport from "./pages/AdminBrandImport";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -20,6 +21,7 @@ const App = () => (
           <Route path="/" element={<Landing />} />
           <Route path="/app" element={<MacroApp />} />
           <Route path="/admin/import" element={<AdminImport />} />
+          <Route path="/admin/brand-import" element={<AdminBrandImport />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
