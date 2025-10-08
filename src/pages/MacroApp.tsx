@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
 const STORAGE_KEY = "macroFinder_settings";
+const REFRESH_TIMESTAMP_KEY = "macroFinder_lastRefresh";
 
 export interface MacroTargets {
   mode: "bulking" | "cutting";
@@ -48,6 +49,7 @@ const MacroApp = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [isRefreshingNearby, setIsRefreshingNearby] = useState(false);
+  const [isRefreshingMenus, setIsRefreshingMenus] = useState(false);
   const [results, setResults] = useState<FoodResult[]>([]);
   const [dbStatus, setDbStatus] = useState<{
     brandCount: number;
@@ -147,6 +149,47 @@ const MacroApp = () => {
     setIsLoading(true);
     
     try {
+      // Check if we need to refresh brand menus (only if location is available)
+      if (targets.lat && targets.lng) {
+        const lastRefresh = localStorage.getItem(REFRESH_TIMESTAMP_KEY);
+        const now = Date.now();
+        const oneHour = 60 * 60 * 1000;
+        
+        // Refresh if never refreshed or last refresh was more than 1 hour ago
+        if (!lastRefresh || (now - parseInt(lastRefresh)) > oneHour) {
+          setIsRefreshingMenus(true);
+          try {
+            const { data: refreshData, error: refreshError } = await supabase.functions.invoke(
+              'refresh_brand_menus',
+              {
+                body: { 
+                  lat: targets.lat, 
+                  lng: targets.lng, 
+                  radiusKm: targets.radiusKm 
+                },
+              }
+            );
+
+            if (!refreshError && refreshData) {
+              console.log('Menu refresh result:', refreshData);
+              if (refreshData.brandsImported > 0) {
+                toast({
+                  title: "Menus refreshed",
+                  description: `Updated ${refreshData.brandsImported} brand menu${refreshData.brandsImported !== 1 ? 's' : ''}`,
+                });
+              }
+            }
+            
+            // Store timestamp regardless of success/failure to avoid hammering
+            localStorage.setItem(REFRESH_TIMESTAMP_KEY, now.toString());
+          } catch (error) {
+            console.error('Menu refresh failed:', error);
+          } finally {
+            setIsRefreshingMenus(false);
+          }
+        }
+      }
+
       const rankResults = await rankItems({
         mode: targets.mode,
         targetProtein: targets.targetProtein,
@@ -416,6 +459,12 @@ const MacroApp = () => {
 
           {/* Results */}
           <div className="lg:col-span-2">
+            {isRefreshingMenus && (
+              <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 px-4 py-3 rounded-lg">
+                <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full" />
+                <span>Refreshing menus...</span>
+              </div>
+            )}
             {isLoading ? (
               <Loader />
             ) : (
