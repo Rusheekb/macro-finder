@@ -10,6 +10,7 @@ export interface RankRequest {
   radiusKm?: number;
   priceCap?: number | null;
   minProtein?: number | null;
+  includeBrands?: string[];
   excludeBrands?: string[];
   lat?: number;
   lng?: number;

@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Search, TrendingUp, Target, TrendingDown, DollarSign, Loader2, MapPin, RefreshCw, Filter } from "lucide-react";
 import { MacroTargets } from "@/pages/MacroApp";
 import { useToast } from "@/hooks/use-toast";
@@ -112,21 +113,34 @@ const ControlsPanel = ({
     onTargetsChange(newTargets);
   };
 
-  const toggleBrand = (brandKey: string) => {
-    const currentExcluded = targets.excludeBrands || [];
-    const isExcluded = currentExcluded.includes(brandKey);
-    
-    onTargetsChange({
-      ...targets,
-      excludeBrands: isExcluded
-        ? currentExcluded.filter(b => b !== brandKey)
-        : [...currentExcluded, brandKey],
-    });
+  const toggleBrand = (brandKey: string, action: 'include' | 'exclude') => {
+    if (action === 'exclude') {
+      const currentExcluded = targets.excludeBrands || [];
+      const isExcluded = currentExcluded.includes(brandKey);
+      
+      onTargetsChange({
+        ...targets,
+        excludeBrands: isExcluded
+          ? currentExcluded.filter(b => b !== brandKey)
+          : [...currentExcluded, brandKey],
+      });
+    } else {
+      const currentIncluded = targets.includeBrands || [];
+      const isIncluded = currentIncluded.includes(brandKey);
+      
+      onTargetsChange({
+        ...targets,
+        includeBrands: isIncluded
+          ? currentIncluded.filter(b => b !== brandKey)
+          : [...currentIncluded, brandKey],
+      });
+    }
   };
 
   return (
-    <Card className="sticky top-6">
-      <CardHeader>
+    <TooltipProvider>
+      <Card className="sticky top-6">
+        <CardHeader>
         <CardTitle className="flex items-center gap-2">
           {targets.mode === "bulking" ? (
             <TrendingUp className="h-5 w-5 text-primary" />
@@ -134,6 +148,18 @@ const ControlsPanel = ({
             <Target className="h-5 w-5 text-primary" />
           )}
           Macro Targets
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-6 w-6 p-0 ml-auto">
+                <span className="text-xs">ℹ️</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs">
+              <p className="text-xs">
+                <strong>Data sources:</strong> Locations from OpenStreetMap; nutrition from Nutritionix/USDA; prices user-reported or baseline.
+              </p>
+            </TooltipContent>
+          </Tooltip>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -342,30 +368,46 @@ const ControlsPanel = ({
           </div>
 
           <div>
-            <Label>Exclude Brands</Label>
-            <div className="mt-2 max-h-40 overflow-y-auto space-y-2 border rounded-md p-2">
+            <Label>Chain Filter</Label>
+            <div className="mt-2 max-h-40 overflow-y-auto space-y-2 border rounded-md p-3 bg-background">
               {brands.length === 0 ? (
                 <p className="text-xs text-muted-foreground">Loading brands...</p>
               ) : (
-                brands.map((brand) => (
-                  <div key={brand.chain_key} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`brand-${brand.chain_key}`}
-                      checked={targets.excludeBrands?.includes(brand.chain_key) || false}
-                      onCheckedChange={() => toggleBrand(brand.chain_key)}
-                    />
-                    <label
-                      htmlFor={`brand-${brand.chain_key}`}
-                      className="text-sm cursor-pointer"
-                    >
-                      {brand.display_name}
-                    </label>
-                  </div>
-                ))
+                brands.map((brand) => {
+                  const isIncluded = targets.includeBrands?.includes(brand.chain_key) || false;
+                  const isExcluded = targets.excludeBrands?.includes(brand.chain_key) || false;
+                  
+                  return (
+                    <div key={brand.chain_key} className="flex items-center justify-between space-x-2 py-1">
+                      <span className="text-sm">{brand.display_name}</span>
+                      <div className="flex gap-2">
+                        <Button
+                          variant={isIncluded ? "default" : "ghost"}
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => toggleBrand(brand.chain_key, 'include')}
+                        >
+                          Include
+                        </Button>
+                        <Button
+                          variant={isExcluded ? "destructive" : "ghost"}
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => toggleBrand(brand.chain_key, 'exclude')}
+                        >
+                          Exclude
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })
               )}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {targets.excludeBrands?.length || 0} brand{targets.excludeBrands?.length !== 1 ? 's' : ''} excluded
+              {targets.includeBrands?.length ? `${targets.includeBrands.length} included` : ''} 
+              {targets.includeBrands?.length && targets.excludeBrands?.length ? ', ' : ''}
+              {targets.excludeBrands?.length ? `${targets.excludeBrands.length} excluded` : ''}
+              {!targets.includeBrands?.length && !targets.excludeBrands?.length ? 'All chains included' : ''}
             </p>
           </div>
         </div>
@@ -399,6 +441,7 @@ const ControlsPanel = ({
         </Button>
       </CardContent>
     </Card>
+    </TooltipProvider>
   );
 };
 

@@ -23,6 +23,7 @@ export interface MacroTargets {
   radiusKm: number;
   priceCap: number;
   minProtein?: number;
+  includeBrands?: string[];
   excludeBrands?: string[];
   lat?: number;
   lng?: number;
@@ -51,6 +52,7 @@ const MacroApp = () => {
   const [isRefreshingNearby, setIsRefreshingNearby] = useState(false);
   const [isRefreshingMenus, setIsRefreshingMenus] = useState(false);
   const [results, setResults] = useState<FoodResult[]>([]);
+  const [nearbyRestaurantCount, setNearbyRestaurantCount] = useState<number | null>(null);
   const [dbStatus, setDbStatus] = useState<{
     brandCount: number;
     restaurantCount: number;
@@ -200,6 +202,7 @@ const MacroApp = () => {
         radiusKm: targets.radiusKm,
         priceCap: targets.priceCap,
         minProtein: targets.minProtein,
+        includeBrands: targets.includeBrands,
         excludeBrands: targets.excludeBrands,
         lat: targets.lat,
         lng: targets.lng,
@@ -366,10 +369,20 @@ const MacroApp = () => {
           if (error) throw error;
 
           const count = data?.count || 0;
-          toast({
-            title: "Restaurants updated",
-            description: `Found ${count} restaurant${count !== 1 ? 's' : ''} nearby`,
-          });
+          setNearbyRestaurantCount(count);
+          
+          if (count === 0) {
+            toast({
+              title: "No chains found nearby",
+              description: `Try increasing radius or search by ZIP code`,
+              variant: "destructive",
+            });
+          } else {
+            toast({
+              title: "Restaurants updated",
+              description: `Found ${count} restaurant${count !== 1 ? 's' : ''} nearby`,
+            });
+          }
 
           // Update location and trigger search
           setTargets((prev) => ({ ...prev, lat, lng }));
