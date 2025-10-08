@@ -13,6 +13,7 @@ interface RankRequest {
   targetProtein?: number | null;
   targetCalories?: number | null;
   minProtein?: number | null;
+  includeBrands?: string[];
   excludeBrands?: string[];
   wP: number;
   wC: number;
@@ -198,6 +199,11 @@ Deno.serve(async (req) => {
       for (const item of brandMenuItems) {
         // Apply minProtein filter
         if (body.minProtein !== null && body.minProtein !== undefined && item.protein_g < body.minProtein) {
+          continue;
+        }
+
+        // Apply includeBrands filter (if specified, only include these brands)
+        if (body.includeBrands && body.includeBrands.length > 0 && !body.includeBrands.includes(brand.chain_key)) {
           continue;
         }
 
