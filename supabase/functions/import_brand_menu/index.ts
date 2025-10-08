@@ -1,8 +1,8 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 interface ImportRequest {
@@ -15,9 +15,9 @@ interface NutritionixBrandMapping {
 
 // Map chain_key to Nutritionix brand_id
 const NUTRITIONIX_BRAND_MAP: NutritionixBrandMapping = {
-  'mcdonalds': '513fbc1283aa2dc80c000053',
-  'chipotle': '513fbc1283aa2dc80c00001b',
-  'wingstop': '52fe814da0ad47e13000000c',
+  mcdonalds: "513fbc1283aa2dc80c000053",
+  chipotle: "513fbc1283aa2dc80c00001b",
+  wingstop: "52fe814da0ad47e13000000c",
 };
 
 interface NutritionixItem {
@@ -39,61 +39,61 @@ interface USDAFoodItem {
 
 Deno.serve(async (req) => {
   // Handle CORS preflight
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const body: ImportRequest = await req.json();
     const { chainKey } = body;
 
     if (!chainKey) {
-      return new Response(
-        JSON.stringify({ error: 'chainKey is required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: "chainKey is required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     console.log(`Importing menu for chain: ${chainKey}`);
 
     // Get brand from database
     const { data: brand, error: brandError } = await supabase
-      .from('brands')
-      .select('id, display_name, last_imported_at')
-      .eq('chain_key', chainKey)
+      .from("brands")
+      .select("id, display_name, last_imported_at")
+      .eq("chain_key", chainKey)
       .maybeSingle();
 
     if (brandError || !brand) {
-      return new Response(
-        JSON.stringify({ error: `Brand not found: ${chainKey}` }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: `Brand not found: ${chainKey}` }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     let items: Array<{ item_name: string; calories: number; protein_g: number; external_ref: string }> = [];
-    let source: 'nutritionix' | 'usda' = 'nutritionix';
+    let source: "nutritionix" | "usda" = "nutritionix";
 
     // Try Nutritionix first
-    const nutritionixAppId = Deno.env.get('NUTRITIONIX_APP_ID');
-    const nutritionixApiKey = Deno.env.get('NUTRITIONIX_API_KEY');
+    const nutritionixAppId = Deno.env.get("NUTRITIONIX_APP_ID_CORRECT");
+    const nutritionixApiKey = Deno.env.get("NUTRITIONIX_API_KEY");
     const nutritionixBrandId = NUTRITIONIX_BRAND_MAP[chainKey];
 
     if (nutritionixAppId && nutritionixApiKey && nutritionixBrandId) {
       try {
         console.log(`Fetching from Nutritionix for brand ${nutritionixBrandId}`);
-        
+
         const nutritionixResponse = await fetch(
           `https://trackapi.nutritionix.com/v2/search/instant?query=${encodeURIComponent(brand.display_name)}`,
           {
             headers: {
-              'x-app-id': nutritionixAppId,
-              'x-app-key': nutritionixApiKey,
+              "x-app-id": nutritionixAppId,
+              "x-app-key": nutritionixApiKey,
             },
-          }
+          },
         );
 
         if (nutritionixResponse.ok) {
@@ -111,32 +111,32 @@ Deno.serve(async (req) => {
               external_ref: `nutritionix:${nutritionixBrandId}:${item.food_name}`,
             }));
         } else if (nutritionixResponse.status === 429) {
-          console.log('Nutritionix rate limited, falling back to USDA');
+          console.log("Nutritionix rate limited, falling back to USDA");
         } else {
           console.log(`Nutritionix error: ${nutritionixResponse.status}`);
         }
       } catch (error) {
-        console.error('Nutritionix fetch failed:', error);
+        console.error("Nutritionix fetch failed:", error);
       }
     }
 
     // Fallback to USDA FoodData Central
     if (items.length === 0) {
-      const usdaApiKey = Deno.env.get('USDA_FDC_API_KEY');
-      
+      const usdaApiKey = Deno.env.get("USDA_FDC_API_KEY");
+
       if (!usdaApiKey) {
-        return new Response(
-          JSON.stringify({ error: 'No API keys configured' }),
-          { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        return new Response(JSON.stringify({ error: "No API keys configured" }), {
+          status: 503,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
       try {
         console.log(`Fetching from USDA for brand ${brand.display_name}`);
-        source = 'usda';
+        source = "usda";
 
         const usdaResponse = await fetch(
-          `https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(brand.display_name)}&dataType=Branded&pageSize=50&api_key=${usdaApiKey}`
+          `https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(brand.display_name)}&dataType=Branded&pageSize=50&api_key=${usdaApiKey}`,
         );
 
         if (usdaResponse.ok) {
@@ -146,9 +146,10 @@ Deno.serve(async (req) => {
           console.log(`USDA returned ${foods.length} items`);
 
           items = foods
-            .filter((food: USDAFoodItem) => 
-              food.brandOwner?.toLowerCase().includes(chainKey.replace('_', ' ')) ||
-              food.description?.toLowerCase().includes(chainKey.replace('_', ' '))
+            .filter(
+              (food: USDAFoodItem) =>
+                food.brandOwner?.toLowerCase().includes(chainKey.replace("_", " ")) ||
+                food.description?.toLowerCase().includes(chainKey.replace("_", " ")),
             )
             .map((food: USDAFoodItem) => ({
               item_name: food.description,
@@ -156,28 +157,28 @@ Deno.serve(async (req) => {
               protein_g: Math.round(food.labelNutrients?.protein?.value || 0),
               external_ref: `usda:${food.fdcId}`,
             }))
-            .filter(item => item.calories > 0); // Filter out items with no calorie data
+            .filter((item) => item.calories > 0); // Filter out items with no calorie data
         } else {
           throw new Error(`USDA API error: ${usdaResponse.status}`);
         }
       } catch (error) {
-        console.error('USDA fetch failed:', error);
-        return new Response(
-          JSON.stringify({ error: 'Failed to fetch menu items from both sources' }),
-          { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        console.error("USDA fetch failed:", error);
+        return new Response(JSON.stringify({ error: "Failed to fetch menu items from both sources" }), {
+          status: 503,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
     }
 
     if (items.length === 0) {
       return new Response(
-        JSON.stringify({ 
-          inserted: 0, 
-          updated: 0, 
+        JSON.stringify({
+          inserted: 0,
+          updated: 0,
           source,
-          message: 'No menu items found'
+          message: "No menu items found",
         }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
@@ -188,10 +189,10 @@ Deno.serve(async (req) => {
     for (const item of items) {
       // Check if item exists
       const { data: existingItem } = await supabase
-        .from('menu_items')
-        .select('id, default_price')
-        .eq('brand_id', brand.id)
-        .eq('item_name', item.item_name)
+        .from("menu_items")
+        .select("id, default_price")
+        .eq("brand_id", brand.id)
+        .eq("item_name", item.item_name)
         .maybeSingle();
 
       const itemData = {
@@ -207,38 +208,33 @@ Deno.serve(async (req) => {
       if (existingItem) {
         // Update existing item, but preserve default_price if set
         const { error: updateError } = await supabase
-          .from('menu_items')
+          .from("menu_items")
           .update({
             calories: itemData.calories,
             protein_g: itemData.protein_g,
             external_ref: itemData.external_ref,
           })
-          .eq('id', existingItem.id);
+          .eq("id", existingItem.id);
 
         if (!updateError) {
           updated++;
         } else {
-          console.error('Failed to update item:', updateError);
+          console.error("Failed to update item:", updateError);
         }
       } else {
         // Insert new item
-        const { error: insertError } = await supabase
-          .from('menu_items')
-          .insert(itemData);
+        const { error: insertError } = await supabase.from("menu_items").insert(itemData);
 
         if (!insertError) {
           inserted++;
         } else {
-          console.error('Failed to insert item:', insertError);
+          console.error("Failed to insert item:", insertError);
         }
       }
     }
 
     // Update last_imported_at
-    await supabase
-      .from('brands')
-      .update({ last_imported_at: new Date().toISOString() })
-      .eq('id', brand.id);
+    await supabase.from("brands").update({ last_imported_at: new Date().toISOString() }).eq("id", brand.id);
 
     console.log(`Import complete: ${inserted} inserted, ${updated} updated from ${source}`);
 
@@ -250,14 +246,13 @@ Deno.serve(async (req) => {
         total: items.length,
         brand: brand.display_name,
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
-
   } catch (error) {
-    console.error('Error in import_brand_menu function:', error);
-    return new Response(
-      JSON.stringify({ error: error.message || 'Internal server error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    console.error("Error in import_brand_menu function:", error);
+    return new Response(JSON.stringify({ error: error.message || "Internal server error" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
