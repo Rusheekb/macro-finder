@@ -17,13 +17,15 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const startTime = Date.now();
+
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const body: RefreshRequest = await req.json();
-    const { lat, lng, radiusKm = 5 } = body;
+    const { lat, lng, radiusKm = 8 } = body;
 
     if (!lat || !lng) {
       return new Response(
@@ -92,44 +94,73 @@ Deno.serve(async (req) => {
 
     console.log(`${brandsToImport.length} brands need importing`);
 
-    // Import each brand
+    // Import each brand with retry logic
     let importedCount = 0;
     const importResults = [];
 
-    for (const brand of brandsToImport) {
-      try {
-        console.log(`Importing ${brand.chain_key}...`);
-        const { data: importData, error: importError } = await supabase.functions.invoke(
-          'import_brand_menu',
-          {
-            body: { chainKey: brand.chain_key },
-          }
-        );
+    const importWithRetry = async (brand: { id: string; chain_key: string }, maxRetries = 3) => {
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          console.log(`Importing ${brand.chain_key} (attempt ${attempt})...`);
+          const { data: importData, error: importError } = await supabase.functions.invoke(
+            'import_brand_menu',
+            {
+              body: { chainKey: brand.chain_key },
+            }
+          );
 
-        if (importError) {
-          console.error(`Failed to import ${brand.chain_key}:`, importError);
-          importResults.push({ brand: brand.chain_key, success: false, error: importError.message });
-        } else {
+          if (importError) {
+            if (attempt < maxRetries && (importError.message?.includes('429') || importError.message?.includes('rate limit'))) {
+              const backoffMs = Math.pow(2, attempt) * 1000; // Exponential backoff: 2s, 4s, 8s
+              console.log(`Rate limited, waiting ${backoffMs}ms before retry...`);
+              await new Promise(resolve => setTimeout(resolve, backoffMs));
+              continue;
+            }
+            throw importError;
+          }
+
+          // Update last_imported_at on success
+          const { error: updateError } = await supabase
+            .from('brands')
+            .update({ last_imported_at: new Date().toISOString() })
+            .eq('id', brand.id);
+
+          if (updateError) {
+            console.error(`Failed to update last_imported_at for ${brand.chain_key}:`, updateError);
+          }
+
           console.log(`Successfully imported ${brand.chain_key}: ${importData.inserted} inserted, ${importData.updated} updated`);
-          importedCount++;
-          importResults.push({ 
+          return { 
             brand: brand.chain_key, 
             success: true, 
             inserted: importData.inserted, 
             updated: importData.updated 
-          });
+          };
+        } catch (error) {
+          if (attempt === maxRetries) {
+            console.error(`Failed to import ${brand.chain_key} after ${maxRetries} attempts:`, error);
+            return { brand: brand.chain_key, success: false, error: error.message };
+          }
         }
-      } catch (error) {
-        console.error(`Error importing ${brand.chain_key}:`, error);
-        importResults.push({ brand: brand.chain_key, success: false, error: error.message });
       }
+    };
+
+    for (const brand of brandsToImport) {
+      const result = await importWithRetry(brand);
+      if (result.success) {
+        importedCount++;
+      }
+      importResults.push(result);
     }
+
+    const durationMs = Date.now() - startTime;
 
     return new Response(
       JSON.stringify({
         brandsChecked: uniqueBrands.size,
         brandsImported: importedCount,
         brandsNeedingImport: brandsToImport.length,
+        durationMs,
         importResults,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
