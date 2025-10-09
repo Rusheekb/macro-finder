@@ -96,7 +96,10 @@ out center tags;
         console.log(`Calling Overpass API (attempt ${retryCount + 1})`);
         const overpassResponse = await fetch('https://overpass-api.de/api/interpreter', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          headers: { 
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'User-Agent': 'MacroFinder/1.0 (https://github.com/macrofinder; contact@macrofinder.com)'
+          },
           body: `data=${encodeURIComponent(overpassQuery)}`,
         });
 
