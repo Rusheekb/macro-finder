@@ -21,6 +21,7 @@ interface ControlsPanelProps {
   isGettingLocation: boolean;
   onRefreshNearby: () => void;
   isRefreshingNearby: boolean;
+  onForceRefresh: () => void;
 }
 
 const PRESETS = {
@@ -38,6 +39,7 @@ const ControlsPanel = ({
   isGettingLocation,
   onRefreshNearby,
   isRefreshingNearby,
+  onForceRefresh,
 }: ControlsPanelProps) => {
   const { toast } = useToast();
   const [brands, setBrands] = useState<Array<{ chain_key: string; display_name: string }>>([]);
@@ -439,6 +441,13 @@ const ControlsPanel = ({
           <Search className="h-4 w-4 mr-2" />
           {isLoading ? "Searching..." : "Find Foods"}
         </Button>
+        <button
+          onClick={onForceRefresh}
+          disabled={isLoading}
+          className="text-xs text-muted-foreground hover:text-foreground underline disabled:opacity-50 mt-2 text-center w-full"
+        >
+          Force refresh menus
+        </button>
       </CardContent>
     </Card>
     </TooltipProvider>

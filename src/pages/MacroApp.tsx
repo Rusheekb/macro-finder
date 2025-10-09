@@ -3,6 +3,9 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, MapPin, AlertTriangle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import ControlsPanel from "@/components/ControlsPanel";
 import ResultsTable from "@/components/ResultsTable";
 import Loader from "@/components/Loader";
@@ -53,6 +56,10 @@ const MacroApp = () => {
   const [isRefreshingMenus, setIsRefreshingMenus] = useState(false);
   const [results, setResults] = useState<FoodResult[]>([]);
   const [nearbyRestaurantCount, setNearbyRestaurantCount] = useState<number | null>(null);
+  const [isZipModalOpen, setIsZipModalOpen] = useState(false);
+  const [zipInput, setZipInput] = useState("");
+  const [isLoadingZip, setIsLoadingZip] = useState(false);
+  const zipResolveRef = useRef<((coords: { lat: number; lng: number } | null) => void) | null>(null);
   const [dbStatus, setDbStatus] = useState<{
     brandCount: number;
     restaurantCount: number;
@@ -147,7 +154,7 @@ const MacroApp = () => {
     }
   }, [targets]);
 
-  const performSearch = useCallback(async () => {
+  const performSearch = useCallback(async (forceRefresh = false) => {
     setIsLoading(true);
     
     try {
@@ -155,10 +162,10 @@ const MacroApp = () => {
       if (targets.lat && targets.lng) {
         const lastRefresh = localStorage.getItem(REFRESH_TIMESTAMP_KEY);
         const now = Date.now();
-        const oneHour = 60 * 60 * 1000;
+        const thirtyMinutes = 30 * 60 * 1000;
         
-        // Refresh if never refreshed or last refresh was more than 1 hour ago
-        if (!lastRefresh || (now - parseInt(lastRefresh)) > oneHour) {
+        // Refresh if never refreshed, forced, or last refresh was more than 30 minutes ago
+        if (forceRefresh || !lastRefresh || (now - parseInt(lastRefresh)) > thirtyMinutes) {
           setIsRefreshingMenus(true);
           try {
             const { data: refreshData, error: refreshError } = await supabase.functions.invoke(
@@ -252,9 +259,126 @@ const MacroApp = () => {
 
     // Set new timer for debounced search
     debounceTimer.current = setTimeout(() => {
-      performSearch();
+      performSearch(false);
     }, 500);
   }, [performSearch]);
+
+  const fetchCoordsFromZip = async (zip: string): Promise<{ lat: number; lng: number } | null> => {
+    try {
+      const response = await fetch(`https://api.zippopotam.us/us/${zip}`);
+      if (!response.ok) return null;
+      
+      const data = await response.json();
+      if (data.places && data.places.length > 0) {
+        return {
+          lat: Number(parseFloat(data.places[0].latitude).toFixed(6)),
+          lng: Number(parseFloat(data.places[0].longitude).toFixed(6)),
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error('Failed to fetch coordinates from ZIP:', error);
+      return null;
+    }
+  };
+
+  const handleZipSubmit = async () => {
+    if (!zipInput.trim()) {
+      toast({
+        title: "ZIP code required",
+        description: "Please enter a valid ZIP code.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoadingZip(true);
+    const coords = await fetchCoordsFromZip(zipInput.trim());
+    setIsLoadingZip(false);
+
+    if (!coords) {
+      toast({
+        title: "Invalid ZIP code",
+        description: "Could not find coordinates for this ZIP code.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsZipModalOpen(false);
+    setZipInput("");
+    
+    if (zipResolveRef.current) {
+      zipResolveRef.current(coords);
+      zipResolveRef.current = null;
+    }
+  };
+
+  const ensureLocation = (): Promise<{ lat: number; lng: number } | null> => {
+    return new Promise((resolve) => {
+      // If we already have location, use it
+      if (targets.lat && targets.lng) {
+        resolve({ lat: targets.lat, lng: targets.lng });
+        return;
+      }
+
+      // Try to get geolocation
+      if (!navigator.geolocation) {
+        // No geolocation support, prompt for ZIP
+        zipResolveRef.current = resolve;
+        setIsZipModalOpen(true);
+        return;
+      }
+
+      setIsGettingLocation(true);
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setIsGettingLocation(false);
+          const coords = {
+            lat: Number(position.coords.latitude.toFixed(6)),
+            lng: Number(position.coords.longitude.toFixed(6)),
+          };
+          resolve(coords);
+        },
+        (error) => {
+          setIsGettingLocation(false);
+          // Geolocation denied or failed, prompt for ZIP
+          zipResolveRef.current = resolve;
+          setIsZipModalOpen(true);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 300000,
+        }
+      );
+    });
+  };
+
+  const handleFindFoods = async () => {
+    const coords = await ensureLocation();
+    
+    if (!coords) {
+      toast({
+        title: "Location required",
+        description: "Please provide your location to find foods.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Update targets with location
+    setTargets((prev) => ({ ...prev, lat: coords.lat, lng: coords.lng }));
+    
+    // Perform search with the new location
+    await performSearch(false);
+  };
+
+  const handleForceRefresh = async () => {
+    // Clear the refresh timestamp to force a refresh
+    localStorage.removeItem(REFRESH_TIMESTAMP_KEY);
+    await performSearch(true);
+  };
 
   const handleLoadDemoData = useCallback(async () => {
     setIsLoadingDemo(true);
@@ -461,12 +585,13 @@ const MacroApp = () => {
             <ControlsPanel
               targets={targets}
               onTargetsChange={setTargets}
-              onSearch={handleSearch}
+              onSearch={handleFindFoods}
               isLoading={isLoading}
               onLocationRequest={handleLocationRequest}
               isGettingLocation={isGettingLocation}
               onRefreshNearby={handleRefreshNearby}
               isRefreshingNearby={isRefreshingNearby}
+              onForceRefresh={handleForceRefresh}
             />
           </div>
 
@@ -526,6 +651,42 @@ const MacroApp = () => {
             )}
           </div>
         )}
+
+        {/* ZIP Code Modal */}
+        <Dialog open={isZipModalOpen} onOpenChange={setIsZipModalOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Enter ZIP Code</DialogTitle>
+              <DialogDescription>
+                We need your location to find nearby restaurants. Please enter your ZIP code.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="zip">ZIP Code</Label>
+                <Input
+                  id="zip"
+                  placeholder="e.g., 90210"
+                  value={zipInput}
+                  onChange={(e) => setZipInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleZipSubmit();
+                    }
+                  }}
+                  maxLength={5}
+                />
+              </div>
+              <Button
+                onClick={handleZipSubmit}
+                disabled={isLoadingZip}
+                className="w-full"
+              >
+                {isLoadingZip ? 'Loading...' : 'Continue'}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
