@@ -26,7 +26,16 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const body: RefreshRequest = await req.json();
-    const { lat, lng, radiusKm = 8, includeBrands = ['mcdonalds', 'chipotle', 'wingstop'] } = body;
+    const { 
+      lat, 
+      lng, 
+      radiusKm = 8, 
+      includeBrands = [
+        'mcdonalds', 'chipotle', 'wingstop', 'subway', 'kfc', 
+        'tacobell', 'burgerking', 'wendys', 'chickfila', 'pandaexpress',
+        'fiveguys', 'panerabread', 'jackinthebox', 'popeyes', 'dominos'
+      ] 
+    } = body;
 
     if (!lat || !lng) {
       return new Response(
@@ -134,7 +143,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`Found ${uniqueBrands.size} unique brands`);
+    const discoveredCount = restaurants.length;
+    console.log(`Discovered ${discoveredCount} restaurants, ${uniqueBrands.size} unique brands`);
 
     // Check which brands need importing (null or older than 7 days)
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -144,7 +154,7 @@ Deno.serve(async (req) => {
       return lastImported < sevenDaysAgo;
     });
 
-    console.log(`${brandsToImport.length} brands need importing`);
+    console.log(`Brands to import: ${brandsToImport.length} of ${uniqueBrands.size}`);
 
     // Import each brand with retry logic
     let importedCount = 0;
@@ -207,8 +217,12 @@ Deno.serve(async (req) => {
 
     const durationMs = Date.now() - startTime;
 
+    console.log(`Refresh complete: ${importedCount}/${brandsToImport.length} imported in ${durationMs}ms`);
+
     return new Response(
       JSON.stringify({
+        discoveredCount,
+        uniqueBrands: uniqueBrands.size,
         brandsChecked: uniqueBrands.size,
         brandsImported: importedCount,
         brandsNeedingImport: brandsToImport.length,

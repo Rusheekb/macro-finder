@@ -32,18 +32,42 @@ interface OverpassResponse {
   elements: OSMElement[];
 }
 
-const BRAND_MAP: Record<string, { chain_key: string; display_name: string }> = {
-  'mcdonalds': { chain_key: 'mcdonalds', display_name: "McDonald's" },
-  'chipotle': { chain_key: 'chipotle', display_name: 'Chipotle Mexican Grill' },
-  'wingstop': { chain_key: 'wingstop', display_name: 'Wingstop' },
+// Normalize text for matching
+function normalize(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+const BRAND_MAP: Record<string, { chain_key: string; display_name: string; synonyms: string[] }> = {
+  'mcdonalds': { chain_key: 'mcdonalds', display_name: "McDonald's", synonyms: ['mcdonald', 'mcdonalds', 'mc donald', 'mc donalds'] },
+  'chipotle': { chain_key: 'chipotle', display_name: 'Chipotle Mexican Grill', synonyms: ['chipotle'] },
+  'wingstop': { chain_key: 'wingstop', display_name: 'Wingstop', synonyms: ['wingstop', 'wing stop'] },
+  'subway': { chain_key: 'subway', display_name: 'Subway', synonyms: ['subway'] },
+  'kfc': { chain_key: 'kfc', display_name: 'KFC', synonyms: ['kfc', 'kentucky fried chicken'] },
+  'tacobell': { chain_key: 'tacobell', display_name: 'Taco Bell', synonyms: ['tacobell', 'taco bell'] },
+  'burgerking': { chain_key: 'burgerking', display_name: 'Burger King', synonyms: ['burgerking', 'burger king'] },
+  'wendys': { chain_key: 'wendys', display_name: "Wendy's", synonyms: ['wendys', 'wendy'] },
+  'chickfila': { chain_key: 'chickfila', display_name: 'Chick-fil-A', synonyms: ['chickfila', 'chick fil a', 'chickfil'] },
+  'pandaexpress': { chain_key: 'pandaexpress', display_name: 'Panda Express', synonyms: ['pandaexpress', 'panda express', 'panda'] },
+  'fiveguys': { chain_key: 'fiveguys', display_name: 'Five Guys', synonyms: ['fiveguys', 'five guys', '5 guys'] },
+  'panerabread': { chain_key: 'panerabread', display_name: 'Panera Bread', synonyms: ['panerabread', 'panera bread', 'panera'] },
+  'jackinthebox': { chain_key: 'jackinthebox', display_name: 'Jack in the Box', synonyms: ['jackinthebox', 'jack in the box'] },
+  'popeyes': { chain_key: 'popeyes', display_name: "Popeyes", synonyms: ['popeyes', 'popeye'] },
+  'dominos': { chain_key: 'dominos', display_name: "Domino's Pizza", synonyms: ['dominos', 'domino'] },
 };
 
 function mapToBrandKey(name: string, brand?: string): { chain_key: string; display_name: string } | null {
-  const searchText = `${name || ''} ${brand || ''}`.toLowerCase();
+  const searchText = normalize(`${name || ''} ${brand || ''}`);
   
   for (const [key, value] of Object.entries(BRAND_MAP)) {
-    if (searchText.includes(key)) {
-      return value;
+    // Check normalized key
+    if (searchText.includes(normalize(key))) {
+      return { chain_key: value.chain_key, display_name: value.display_name };
+    }
+    // Check synonyms
+    for (const synonym of value.synonyms) {
+      if (searchText.includes(normalize(synonym))) {
+        return { chain_key: value.chain_key, display_name: value.display_name };
+      }
     }
   }
   
@@ -73,17 +97,32 @@ Deno.serve(async (req) => {
 
     console.log(`Searching for restaurants near ${lat}, ${lng} within ${radiusKm}km`, chainKeys);
 
-    // Build brand regex dynamically from chainKeys
-    const brandFragments = chainKeys.map(key => {
+    // Build robust brand regex dynamically from chainKeys
+    const brandPatterns: string[] = [];
+    for (const key of chainKeys) {
       const brand = BRAND_MAP[key.toLowerCase()];
-      if (!brand) return null;
-      // Extract display name first word (e.g., "McDonald's" -> "McDonald")
-      return brand.display_name.split(/[\s']/)[0];
-    }).filter(Boolean);
+      if (!brand) continue;
+      
+      // Build pattern from display name and synonyms
+      const patterns = [brand.display_name];
+      if (brand.chain_key === 'mcdonalds') {
+        patterns.push('McDonald', 'McDonalds', "McDonald's", 'Mc Donald');
+      } else if (brand.chain_key === 'chickfila') {
+        patterns.push('Chick[- ]?fil[- ]?A');
+      } else if (brand.chain_key === 'tacobell') {
+        patterns.push('Taco[ ]?Bell');
+      } else if (brand.chain_key === 'burgerking') {
+        patterns.push('Burger[ ]?King');
+      } else if (brand.chain_key === 'fiveguys') {
+        patterns.push('Five[ ]?Guys', '5[ ]?Guys');
+      }
+      
+      brandPatterns.push(...patterns);
+    }
 
-    const brandRegex = brandFragments.length > 0 
-      ? brandFragments.join('|') 
-      : 'McDonald|Chipotle|Wingstop';
+    const brandRegex = brandPatterns.length > 0 
+      ? brandPatterns.join('|') 
+      : 'McDonald|Chipotle|Wingstop|Subway|KFC|Taco Bell|Burger King|Wendy|Chick[- ]?fil[- ]?A|Panda|Five Guys|Panera|Jack in the Box|Popeyes|Domino';
 
     // Build Overpass QL query
     const radiusMeters = radiusKm * 1000;
@@ -98,10 +137,10 @@ Deno.serve(async (req) => {
 out center tags;
     `.trim();
 
-    // Call Overpass API with retry logic
+    // Call Overpass API with improved retry logic
     let overpassData: OverpassResponse | null = null;
     let retryCount = 0;
-    const maxRetries = 1;
+    const maxRetries = 2;
 
     while (retryCount <= maxRetries && !overpassData) {
       try {
@@ -110,14 +149,17 @@ out center tags;
           method: 'POST',
           headers: { 
             'Content-Type': 'application/x-www-form-urlencoded',
+            'Accept': 'application/json',
             'User-Agent': 'MacroFinder/1.0 (https://github.com/macrofinder; contact@macrofinder.com)'
           },
           body: `data=${encodeURIComponent(overpassQuery)}`,
         });
 
-        if (overpassResponse.status === 429) {
-          console.log('Rate limited by Overpass API, retrying...');
-          await new Promise(resolve => setTimeout(resolve, 2000));
+        if (overpassResponse.status === 429 || overpassResponse.status === 504) {
+          const jitter = Math.random() * 500;
+          const backoffMs = Math.pow(1.5, retryCount) * 1000 + jitter;
+          console.log(`Rate limited (${overpassResponse.status}), waiting ${Math.round(backoffMs)}ms...`);
+          await new Promise(resolve => setTimeout(resolve, backoffMs));
           retryCount++;
           continue;
         }
@@ -131,7 +173,9 @@ out center tags;
       } catch (error) {
         console.error('Overpass API call failed:', error);
         if (retryCount < maxRetries) {
-          await new Promise(resolve => setTimeout(resolve, 1500));
+          const jitter = Math.random() * 500;
+          const backoffMs = Math.pow(1.5, retryCount) * 1000 + jitter;
+          await new Promise(resolve => setTimeout(resolve, backoffMs));
           retryCount++;
         } else {
           throw error;

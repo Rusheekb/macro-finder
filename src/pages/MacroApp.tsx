@@ -390,7 +390,7 @@ const MacroApp = () => {
 
       toast({
         title: "Demo data loaded",
-        description: `Inserted ${data.inserted.brands} brands, ${data.inserted.menuItems} items, ${data.inserted.restaurants} restaurants`,
+        description: `Loaded ${data.inserted.brands} brands, ${data.inserted.menuItems} items, ${data.inserted.restaurants} restaurants`,
       });
 
       // Refresh db status
@@ -399,8 +399,8 @@ const MacroApp = () => {
         setDbStatus(statusData);
       }
 
-      // Trigger a new search
-      performSearch();
+      // Trigger a new search after demo data loads
+      await performSearch(false);
     } catch (error) {
       console.error('Failed to load demo data:', error);
       toast({
@@ -620,16 +620,14 @@ const MacroApp = () => {
           <div className="fixed bottom-4 right-4 z-50">
             {dbStatus.brandCount === 0 || dbStatus.restaurantCount === 0 || dbStatus.itemCount === 0 ? (
               <div className="flex flex-col gap-2 items-end">
-                {import.meta.env.VITE_ALLOW_DEMO_SEED === 'true' && (
-                  <Button
-                    onClick={handleLoadDemoData}
-                    disabled={isLoadingDemo}
-                    size="sm"
-                    className="shadow-lg"
-                  >
-                    {isLoadingDemo ? 'Loading...' : 'Load demo data'}
-                  </Button>
-                )}
+                <Button
+                  onClick={handleLoadDemoData}
+                  disabled={isLoadingDemo}
+                  size="sm"
+                  className="shadow-lg"
+                >
+                  {isLoadingDemo ? 'Loading...' : 'Load demo data'}
+                </Button>
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
