@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const body: NearbyRequest = await req.json();
-    const { lat, lng, radiusKm = 8 } = body;
+    const { lat, lng, radiusKm = 8, chainKeys = ['mcdonalds', 'chipotle', 'wingstop'] } = body;
 
     if (!lat || !lng) {
       return new Response(
@@ -71,17 +71,29 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log(`Searching for restaurants near ${lat}, ${lng} within ${radiusKm}km`);
+    console.log(`Searching for restaurants near ${lat}, ${lng} within ${radiusKm}km`, chainKeys);
+
+    // Build brand regex dynamically from chainKeys
+    const brandFragments = chainKeys.map(key => {
+      const brand = BRAND_MAP[key.toLowerCase()];
+      if (!brand) return null;
+      // Extract display name first word (e.g., "McDonald's" -> "McDonald")
+      return brand.display_name.split(/[\s']/)[0];
+    }).filter(Boolean);
+
+    const brandRegex = brandFragments.length > 0 
+      ? brandFragments.join('|') 
+      : 'McDonald|Chipotle|Wingstop';
 
     // Build Overpass QL query
     const radiusMeters = radiusKm * 1000;
     const overpassQuery = `
 [out:json][timeout:25];
 (
-  node["amenity"~"^(fast_food|restaurant)$"]["brand"~"(McDonald|Chipotle|Wingstop)",i](around:${radiusMeters},${lat},${lng});
-  node["amenity"~"^(fast_food|restaurant)$"]["name"~"(McDonald|Chipotle|Wingstop)",i](around:${radiusMeters},${lat},${lng});
-  way["amenity"~"^(fast_food|restaurant)$"]["brand"~"(McDonald|Chipotle|Wingstop)",i](around:${radiusMeters},${lat},${lng});
-  way["amenity"~"^(fast_food|restaurant)$"]["name"~"(McDonald|Chipotle|Wingstop)",i](around:${radiusMeters},${lat},${lng});
+  node["amenity"~"^(fast_food|restaurant)$"]["brand"~"(${brandRegex})",i](around:${radiusMeters},${lat},${lng});
+  node["amenity"~"^(fast_food|restaurant)$"]["name"~"(${brandRegex})",i](around:${radiusMeters},${lat},${lng});
+  way["amenity"~"^(fast_food|restaurant)$"]["brand"~"(${brandRegex})",i](around:${radiusMeters},${lat},${lng});
+  way["amenity"~"^(fast_food|restaurant)$"]["name"~"(${brandRegex})",i](around:${radiusMeters},${lat},${lng});
 );
 out center tags;
     `.trim();

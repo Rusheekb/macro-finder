@@ -174,7 +174,8 @@ const MacroApp = () => {
                 body: { 
                   lat: targets.lat, 
                   lng: targets.lng, 
-                  radiusKm: targets.radiusKm 
+                  radiusKm: targets.radiusKm,
+                  includeBrands: targets.includeBrands 
                 },
               }
             );

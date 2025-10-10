@@ -9,6 +9,7 @@ interface RefreshRequest {
   lat: number;
   lng: number;
   radiusKm?: number;
+  includeBrands?: string[];
 }
 
 Deno.serve(async (req) => {
@@ -25,7 +26,7 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const body: RefreshRequest = await req.json();
-    const { lat, lng, radiusKm = 8 } = body;
+    const { lat, lng, radiusKm = 8, includeBrands = ['mcdonalds', 'chipotle', 'wingstop'] } = body;
 
     if (!lat || !lng) {
       return new Response(
@@ -34,38 +35,89 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log(`Refreshing brand menus near (${lat}, ${lng}) within ${radiusKm}km`);
+    console.log(`Refreshing brand menus near (${lat}, ${lng}) within ${radiusKm}km`, includeBrands);
 
-    // Calculate bounding box for radius search
-    // Rough approximation: 1 degree ≈ 111km
-    const latDelta = radiusKm / 111;
-    const lngDelta = radiusKm / (111 * Math.cos(lat * Math.PI / 180));
+    // Helper to query restaurants in bounding box
+    const queryRestaurants = async (radius: number) => {
+      const latDelta = radius / 111;
+      const lngDelta = radius / (111 * Math.cos(lat * Math.PI / 180));
 
-    // Query restaurants within radius and get unique brands
-    const { data: restaurants, error: restaurantsError } = await supabase
-      .from('restaurants')
-      .select('brand_id, brands!inner(id, chain_key, last_imported_at)')
-      .gte('lat', lat - latDelta)
-      .lte('lat', lat + latDelta)
-      .gte('lng', lng - lngDelta)
-      .lte('lng', lng + lngDelta)
-      .not('brand_id', 'is', null);
+      const { data, error } = await supabase
+        .from('restaurants')
+        .select('brand_id, brands!inner(id, chain_key, last_imported_at)')
+        .gte('lat', lat - latDelta)
+        .lte('lat', lat + latDelta)
+        .gte('lng', lng - lngDelta)
+        .lte('lng', lng + lngDelta)
+        .not('brand_id', 'is', null);
+
+      return { data, error };
+    };
+
+    // Query restaurants within radius
+    let { data: restaurants, error: restaurantsError } = await queryRestaurants(radiusKm);
 
     if (restaurantsError) {
       console.error('Failed to query restaurants:', restaurantsError);
       throw restaurantsError;
     }
 
+    // If no restaurants found, call nearby to discover them
     if (!restaurants || restaurants.length === 0) {
-      console.log('No restaurants found in radius');
-      return new Response(
-        JSON.stringify({
-          brandsChecked: 0,
-          brandsImported: 0,
-          message: 'No restaurants found in radius',
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.log('No restaurants in DB, calling nearby to discover...');
+      
+      let currentRadius = radiusKm;
+      let nearbyAttempts = 0;
+      const maxAttempts = 3;
+
+      while (nearbyAttempts < maxAttempts) {
+        try {
+          const { data: nearbyData, error: nearbyError } = await supabase.functions.invoke(
+            'nearby',
+            {
+              body: { lat, lng, radiusKm: currentRadius, chainKeys: includeBrands },
+            }
+          );
+
+          if (nearbyError) {
+            console.error('Nearby call failed:', nearbyError);
+            break;
+          }
+
+          const nearbyCount = nearbyData?.count || 0;
+          console.log(`Nearby discovered ${nearbyCount} restaurants at ${currentRadius}km`);
+
+          if (nearbyCount > 0) {
+            // Re-query restaurants after nearby discovery
+            const { data: newRestaurants } = await queryRestaurants(currentRadius);
+            restaurants = newRestaurants;
+            break;
+          }
+
+          // Expand radius and retry
+          nearbyAttempts++;
+          if (nearbyAttempts < maxAttempts) {
+            currentRadius = currentRadius * 1.5;
+            console.log(`Expanding radius to ${currentRadius.toFixed(1)}km...`);
+          }
+        } catch (error) {
+          console.error('Error calling nearby:', error);
+          break;
+        }
+      }
+
+      // Final check after all attempts
+      if (!restaurants || restaurants.length === 0) {
+        console.log('No restaurants found after nearby discovery attempts');
+        return new Response(
+          JSON.stringify({
+            brandsChecked: 0,
+            brandsImported: 0,
+            message: 'No restaurants found nearby. Try expanding your search radius or visiting areas with chain restaurants.',
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     // Get unique brands
