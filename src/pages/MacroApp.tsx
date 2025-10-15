@@ -155,6 +155,13 @@ const MacroApp = () => {
   }, [targets]);
 
   const performSearch = useCallback(async (forceRefresh = false) => {
+    console.log('🔍 [SEARCH FLOW] Starting performSearch', { 
+      forceRefresh, 
+      hasLocation: !!(targets.lat && targets.lng),
+      location: targets.lat && targets.lng ? { lat: targets.lat, lng: targets.lng } : 'NO LOCATION',
+      radiusKm: targets.radiusKm 
+    });
+    
     setIsLoading(true);
     
     try {
@@ -163,10 +170,20 @@ const MacroApp = () => {
         const lastRefresh = localStorage.getItem(REFRESH_TIMESTAMP_KEY);
         const now = Date.now();
         const thirtyMinutes = 30 * 60 * 1000;
+        const shouldRefresh = forceRefresh || !lastRefresh || (now - parseInt(lastRefresh)) > thirtyMinutes;
+        
+        console.log('🔍 [SEARCH FLOW] Menu refresh check', { 
+          shouldRefresh, 
+          forceRefresh,
+          lastRefresh: lastRefresh ? new Date(parseInt(lastRefresh)).toISOString() : 'NEVER',
+          minutesSinceRefresh: lastRefresh ? Math.round((now - parseInt(lastRefresh)) / 60000) : 'N/A'
+        });
         
         // Refresh if never refreshed, forced, or last refresh was more than 30 minutes ago
-        if (forceRefresh || !lastRefresh || (now - parseInt(lastRefresh)) > thirtyMinutes) {
+        if (shouldRefresh) {
           setIsRefreshingMenus(true);
+          console.log('🔄 [REFRESH] Calling refresh_brand_menus edge function...');
+          
           try {
             const { data: refreshData, error: refreshError } = await supabase.functions.invoke(
               'refresh_brand_menus',
@@ -180,8 +197,10 @@ const MacroApp = () => {
               }
             );
 
-            if (!refreshError && refreshData) {
-              console.log('Menu refresh result:', refreshData);
+            if (refreshError) {
+              console.error('❌ [REFRESH] Menu refresh error:', refreshError);
+            } else if (refreshData) {
+              console.log('✅ [REFRESH] Menu refresh result:', refreshData);
               if (refreshData.brandsImported > 0) {
                 toast({
                   title: "Menus refreshed",
@@ -193,13 +212,16 @@ const MacroApp = () => {
             // Store timestamp regardless of success/failure to avoid hammering
             localStorage.setItem(REFRESH_TIMESTAMP_KEY, now.toString());
           } catch (error) {
-            console.error('Menu refresh failed:', error);
+            console.error('❌ [REFRESH] Menu refresh failed:', error);
           } finally {
             setIsRefreshingMenus(false);
           }
         }
+      } else {
+        console.warn('⚠️ [SEARCH FLOW] No location available, skipping menu refresh');
       }
 
+      console.log('🎯 [RANK] Calling rankItems edge function...');
       const rankResults = await rankItems({
         mode: targets.mode,
         targetProtein: targets.targetProtein,
@@ -215,6 +237,8 @@ const MacroApp = () => {
         lat: targets.lat,
         lng: targets.lng,
       });
+
+      console.log('✅ [RANK] Received results:', { count: rankResults.length });
 
       // Map to FoodResult format
       const mappedResults: FoodResult[] = rankResults.map((item) => ({
@@ -357,9 +381,12 @@ const MacroApp = () => {
   };
 
   const handleFindFoods = async () => {
+    console.log('🚀 [FIND FOODS] User clicked Find Foods button');
+    
     const coords = await ensureLocation();
     
     if (!coords) {
+      console.warn('⚠️ [FIND FOODS] No location provided by user');
       toast({
         title: "Location required",
         description: "Please provide your location to find foods.",
@@ -367,6 +394,8 @@ const MacroApp = () => {
       });
       return;
     }
+
+    console.log('📍 [FIND FOODS] Location obtained:', coords);
 
     // Update targets with location
     setTargets((prev) => ({ ...prev, lat: coords.lat, lng: coords.lng }));
@@ -376,17 +405,21 @@ const MacroApp = () => {
   };
 
   const handleForceRefresh = async () => {
+    console.log('🔄 [FORCE REFRESH] User clicked force refresh button');
     // Clear the refresh timestamp to force a refresh
     localStorage.removeItem(REFRESH_TIMESTAMP_KEY);
     await performSearch(true);
   };
 
   const handleLoadDemoData = useCallback(async () => {
+    console.log('📦 [DEMO DATA] User clicked Load Demo Data');
     setIsLoadingDemo(true);
     try {
       const { data, error } = await supabase.functions.invoke('seed_demo');
       
       if (error) throw error;
+
+      console.log('✅ [DEMO DATA] Successfully loaded:', data);
 
       toast({
         title: "Demo data loaded",
@@ -399,10 +432,15 @@ const MacroApp = () => {
         setDbStatus(statusData);
       }
 
+      // Set Frisco, TX coordinates for demo data
+      const friscoCoords = { lat: 33.1507, lng: -96.8236 };
+      console.log('📍 [DEMO DATA] Setting location to Frisco, TX:', friscoCoords);
+      setTargets((prev) => ({ ...prev, ...friscoCoords }));
+
       // Trigger a new search after demo data loads
       await performSearch(false);
     } catch (error) {
-      console.error('Failed to load demo data:', error);
+      console.error('❌ [DEMO DATA] Failed to load demo data:', error);
       toast({
         title: "Failed to load demo data",
         description: error.message || "Please try again",
