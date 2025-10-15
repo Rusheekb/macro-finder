@@ -7,6 +7,7 @@ import Landing from "./pages/Landing";
 import MacroApp from "./pages/MacroApp";
 import AdminImport from "./pages/AdminImport";
 import AdminBrandImport from "./pages/AdminBrandImport";
+import Install from "./pages/Install";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -20,6 +21,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/app" element={<MacroApp />} />
+          <Route path="/install" element={<Install />} />
           <Route path="/admin/import" element={<AdminImport />} />
           <Route path="/admin/brand-import" element={<AdminBrandImport />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
