@@ -38,21 +38,76 @@ function normalize(s: string): string {
 }
 
 const BRAND_MAP: Record<string, { chain_key: string; display_name: string; synonyms: string[] }> = {
+  // Burgers & Fast Food
   'mcdonalds': { chain_key: 'mcdonalds', display_name: "McDonald's", synonyms: ['mcdonald', 'mcdonalds', 'mc donald', 'mc donalds'] },
-  'chipotle': { chain_key: 'chipotle', display_name: 'Chipotle Mexican Grill', synonyms: ['chipotle'] },
-  'wingstop': { chain_key: 'wingstop', display_name: 'Wingstop', synonyms: ['wingstop', 'wing stop'] },
-  'subway': { chain_key: 'subway', display_name: 'Subway', synonyms: ['subway'] },
-  'kfc': { chain_key: 'kfc', display_name: 'KFC', synonyms: ['kfc', 'kentucky fried chicken'] },
-  'tacobell': { chain_key: 'tacobell', display_name: 'Taco Bell', synonyms: ['tacobell', 'taco bell'] },
   'burgerking': { chain_key: 'burgerking', display_name: 'Burger King', synonyms: ['burgerking', 'burger king'] },
   'wendys': { chain_key: 'wendys', display_name: "Wendy's", synonyms: ['wendys', 'wendy'] },
-  'chickfila': { chain_key: 'chickfila', display_name: 'Chick-fil-A', synonyms: ['chickfila', 'chick fil a', 'chickfil'] },
-  'pandaexpress': { chain_key: 'pandaexpress', display_name: 'Panda Express', synonyms: ['pandaexpress', 'panda express', 'panda'] },
   'fiveguys': { chain_key: 'fiveguys', display_name: 'Five Guys', synonyms: ['fiveguys', 'five guys', '5 guys'] },
-  'panerabread': { chain_key: 'panerabread', display_name: 'Panera Bread', synonyms: ['panerabread', 'panera bread', 'panera'] },
+  'shakeshack': { chain_key: 'shakeshack', display_name: 'Shake Shack', synonyms: ['shakeshack', 'shake shack'] },
+  'innout': { chain_key: 'innout', display_name: 'In-N-Out Burger', synonyms: ['innout', 'in n out', 'in out'] },
+  'whataburger': { chain_key: 'whataburger', display_name: 'Whataburger', synonyms: ['whataburger', 'what a burger'] },
+  'culvers': { chain_key: 'culvers', display_name: "Culver's", synonyms: ['culvers', 'culver'] },
   'jackinthebox': { chain_key: 'jackinthebox', display_name: 'Jack in the Box', synonyms: ['jackinthebox', 'jack in the box'] },
+  'carls': { chain_key: 'carls', display_name: "Carl's Jr.", synonyms: ['carls', 'carlsjr', 'carls jr', 'carl jr'] },
+  'hardees': { chain_key: 'hardees', display_name: "Hardee's", synonyms: ['hardees', 'hardee'] },
+  'sonic': { chain_key: 'sonic', display_name: 'Sonic Drive-In', synonyms: ['sonic'] },
+  'arbys': { chain_key: 'arbys', display_name: "Arby's", synonyms: ['arbys', 'arby'] },
+  'whitcastle': { chain_key: 'whitcastle', display_name: 'White Castle', synonyms: ['whitcastle', 'white castle'] },
+
+  // Chicken
+  'chickfila': { chain_key: 'chickfila', display_name: 'Chick-fil-A', synonyms: ['chickfila', 'chick fil a', 'chickfil'] },
+  'kfc': { chain_key: 'kfc', display_name: 'KFC', synonyms: ['kfc', 'kentucky fried chicken'] },
   'popeyes': { chain_key: 'popeyes', display_name: "Popeyes", synonyms: ['popeyes', 'popeye'] },
+  'wingstop': { chain_key: 'wingstop', display_name: 'Wingstop', synonyms: ['wingstop', 'wing stop'] },
+  'raisingcanes': { chain_key: 'raisingcanes', display_name: "Raising Cane's", synonyms: ['raisingcanes', 'raising canes', 'canes'] },
+  'zaxbys': { chain_key: 'zaxbys', display_name: "Zaxby's", synonyms: ['zaxbys', 'zaxby'] },
+  'bojangles': { chain_key: 'bojangles', display_name: "Bojangles", synonyms: ['bojangles'] },
+  'churchs': { chain_key: 'churchs', display_name: "Church's Chicken", synonyms: ['churchs', 'church chicken'] },
+
+  // Mexican
+  'chipotle': { chain_key: 'chipotle', display_name: 'Chipotle Mexican Grill', synonyms: ['chipotle'] },
+  'tacobell': { chain_key: 'tacobell', display_name: 'Taco Bell', synonyms: ['tacobell', 'taco bell'] },
+  'qdoba': { chain_key: 'qdoba', display_name: 'Qdoba Mexican Eats', synonyms: ['qdoba'] },
+  'moes': { chain_key: 'moes', display_name: "Moe's Southwest Grill", synonyms: ['moes', 'moe'] },
+  'deltaco': { chain_key: 'deltaco', display_name: 'Del Taco', synonyms: ['deltaco', 'del taco'] },
+  'bajafresh': { chain_key: 'bajafresh', display_name: 'Baja Fresh', synonyms: ['bajafresh', 'baja fresh'] },
+  'elpollo': { chain_key: 'elpollo', display_name: 'El Pollo Loco', synonyms: ['elpollo', 'el pollo loco'] },
+
+  // Sandwiches
+  'subway': { chain_key: 'subway', display_name: 'Subway', synonyms: ['subway'] },
+  'jimmyjohns': { chain_key: 'jimmyjohns', display_name: "Jimmy John's", synonyms: ['jimmyjohns', 'jimmy johns', 'jimmy john'] },
+  'jerseymikes': { chain_key: 'jerseymikes', display_name: "Jersey Mike's Subs", synonyms: ['jerseymikes', 'jersey mikes', 'jersey mike'] },
+  'firehouse': { chain_key: 'firehouse', display_name: 'Firehouse Subs', synonyms: ['firehouse', 'firehouse subs'] },
+  'potbelly': { chain_key: 'potbelly', display_name: 'Potbelly Sandwich Shop', synonyms: ['potbelly'] },
+  'quiznos': { chain_key: 'quiznos', display_name: 'Quiznos', synonyms: ['quiznos'] },
+  'portillos': { chain_key: 'portillos', display_name: "Portillo's", synonyms: ['portillos', 'portillo'] },
+
+  // Pizza
   'dominos': { chain_key: 'dominos', display_name: "Domino's Pizza", synonyms: ['dominos', 'domino'] },
+  'pizzahut': { chain_key: 'pizzahut', display_name: 'Pizza Hut', synonyms: ['pizzahut', 'pizza hut'] },
+  'papajohns': { chain_key: 'papajohns', display_name: "Papa John's", synonyms: ['papajohns', 'papa johns', 'papa john'] },
+  'littlecaesars': { chain_key: 'littlecaesars', display_name: 'Little Caesars', synonyms: ['littlecaesars', 'little caesars'] },
+  'blazepizza': { chain_key: 'blazepizza', display_name: 'Blaze Pizza', synonyms: ['blazepizza', 'blaze pizza'] },
+  'modpizza': { chain_key: 'modpizza', display_name: 'MOD Pizza', synonyms: ['modpizza', 'mod pizza'] },
+  'cicis': { chain_key: 'cicis', display_name: "Cici's Pizza", synonyms: ['cicis', 'cici'] },
+
+  // Fast Casual
+  'panerabread': { chain_key: 'panerabread', display_name: 'Panera Bread', synonyms: ['panerabread', 'panera bread', 'panera'] },
+  'pandaexpress': { chain_key: 'pandaexpress', display_name: 'Panda Express', synonyms: ['pandaexpress', 'panda express', 'panda'] },
+  'caferiodejaneiro': { chain_key: 'caferiodejaneiro', display_name: 'Cafe Rio', synonyms: ['caferiodejaneiro', 'cafe rio'] },
+  'noodles': { chain_key: 'noodles', display_name: 'Noodles & Company', synonyms: ['noodles', 'noodles company'] },
+  'jasonsdeli': { chain_key: 'jasonsdeli', display_name: "Jason's Deli", synonyms: ['jasonsdeli', 'jasons deli', 'jason deli'] },
+  'waba': { chain_key: 'waba', display_name: 'Waba Grill', synonyms: ['waba', 'waba grill'] },
+
+  // Coffee & Breakfast
+  'starbucks': { chain_key: 'starbucks', display_name: 'Starbucks', synonyms: ['starbucks'] },
+  'dunkin': { chain_key: 'dunkin', display_name: 'Dunkin', synonyms: ['dunkin', 'dunkin donuts'] },
+  'dutchbros': { chain_key: 'dutchbros', display_name: 'Dutch Bros Coffee', synonyms: ['dutchbros', 'dutch bros'] },
+  'timhortons': { chain_key: 'timhortons', display_name: 'Tim Hortons', synonyms: ['timhortons', 'tim hortons'] },
+  'cariboucoffee': { chain_key: 'cariboucoffee', display_name: 'Caribou Coffee', synonyms: ['cariboucoffee', 'caribou coffee'] },
+  'ihop': { chain_key: 'ihop', display_name: 'IHOP', synonyms: ['ihop'] },
+  'dennys': { chain_key: 'dennys', display_name: "Denny's", synonyms: ['dennys', 'denny'] },
+  'wafflehouse': { chain_key: 'wafflehouse', display_name: 'Waffle House', synonyms: ['wafflehouse', 'waffle house'] },
 };
 
 function mapToBrandKey(name: string, brand?: string): { chain_key: string; display_name: string } | null {

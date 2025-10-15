@@ -31,9 +31,15 @@ Deno.serve(async (req) => {
       lng, 
       radiusKm = 8, 
       includeBrands = [
-        'mcdonalds', 'chipotle', 'wingstop', 'subway', 'kfc', 
-        'tacobell', 'burgerking', 'wendys', 'chickfila', 'pandaexpress',
-        'fiveguys', 'panerabread', 'jackinthebox', 'popeyes', 'dominos'
+        // Top tier chains (most coverage)
+        'mcdonalds', 'chipotle', 'wingstop', 'subway', 'kfc', 'tacobell', 'burgerking', 'wendys',
+        'chickfila', 'pandaexpress', 'fiveguys', 'panerabread', 'popeyes', 'dominos', 'pizzahut',
+        // Mid tier chains  
+        'shakeshack', 'raisingcanes', 'jimmyjohns', 'jerseymikes', 'qdoba', 'moes', 'papajohns',
+        'starbucks', 'dunkin', 'sonic', 'arbys', 'firehouse', 'zaxbys', 'littlecaesars',
+        // Regional favorites
+        'innout', 'whataburger', 'culvers', 'deltaco', 'jackinthebox', 'potbelly', 'blazepizza',
+        'modpizza', 'dutchbros', 'bajafresh', 'waba', 'elpollo', 'carls', 'hardees'
       ] 
     } = body;
 
