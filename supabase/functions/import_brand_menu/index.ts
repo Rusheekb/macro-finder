@@ -14,10 +14,49 @@ interface NutritionixBrandMapping {
 }
 
 // Map chain_key to Nutritionix brand_id
+// Note: Add more brand IDs as they're discovered from Nutritionix API
 const NUTRITIONIX_BRAND_MAP: NutritionixBrandMapping = {
+  // Major chains with known Nutritionix IDs
   mcdonalds: "513fbc1283aa2dc80c000053",
   chipotle: "513fbc1283aa2dc80c00001b",
   wingstop: "52fe814da0ad47e13000000c",
+  tacobell: "513fbc1283aa2dc80c00003e",
+  subway: "513fbc1283aa2dc80c00003c",
+  kfc: "513fbc1283aa2dc80c000026",
+  pizzahut: "513fbc1283aa2dc80c000033",
+  starbucks: "513fbc1283aa2dc80c00003b",
+  wendys: "513fbc1283aa2dc80c000046",
+  burgerking: "513fbc1283aa2dc80c000011",
+  dunkin: "513fbc1283aa2dc80c00001e",
+  arbys: "513fbc1283aa2dc80c00000a",
+  chickfila: "513fbc1283aa2dc80c00001c",
+  panerabread: "513fbc1283aa2dc80c000031",
+  pandaexpress: "513fbc1283aa2dc80c000030",
+  dominos: "513fbc1283aa2dc80c00001d",
+  papajohns: "513fbc1283aa2dc80c000032",
+  jimmyjohns: "513fbc1283aa2dc80c000025",
+  popeyes: "513fbc1283aa2dc80c000035",
+  fiveguys: "513fbc1283aa2dc80c000020",
+  sonic: "513fbc1283aa2dc80c00003a",
+  jackinthebox: "513fbc1283aa2dc80c000024",
+  whataburger: "513fbc1283aa2dc80c000045",
+  innout: "513fbc1283aa2dc80c000023",
+  qdoba: "513fbc1283aa2dc80c000036",
+  deltaco: "55df87f9cc4bf65128004d7e",
+  elpollo: "55df881bcc4bf65128004d80",
+  jerseymikes: "55df891acc4bf65128004d82",
+  firehouse: "55df8937cc4bf65128004d84",
+  waba: "55e0acbecc4bf6512801b270",
+  raisingcanes: "55e0ae39cc4bf6512801b274",
+  zaxbys: "55e0aec1cc4bf6512801b276",
+  culvers: "55e0af35cc4bf6512801b278",
+  shakeshack: "55e0af62cc4bf6512801b27a",
+  bojangles: "55e0af89cc4bf6512801b27c",
+  moes: "55e0afafcc4bf6512801b27e",
+  littlecaesars: "55e0afcdcc4bf6512801b280",
+  
+  // Additional chains - will use brand name search fallback if no ID
+  // The import function will search by display_name if brand_id not found
 };
 
 interface NutritionixItem {
