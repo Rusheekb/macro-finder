@@ -158,31 +158,18 @@ Deno.serve(async (req) => {
       const brand = BRAND_MAP[key.toLowerCase()];
       if (!brand) continue;
       
-      // Build pattern from display name and synonyms
-      const patterns = [brand.display_name];
-      if (brand.chain_key === 'mcdonalds') {
-        patterns.push('McDonald', 'McDonalds', "McDonald's", 'Mc Donald');
-      } else if (brand.chain_key === 'chickfila') {
-        patterns.push('Chick[- ]?fil[- ]?A');
-      } else if (brand.chain_key === 'tacobell') {
-        patterns.push('Taco[ ]?Bell');
-      } else if (brand.chain_key === 'burgerking') {
-        patterns.push('Burger[ ]?King');
-      } else if (brand.chain_key === 'fiveguys') {
-        patterns.push('Five[ ]?Guys', '5[ ]?Guys');
-      }
-      
-      brandPatterns.push(...patterns);
+      // Add all synonyms to patterns
+      brandPatterns.push(...brand.synonyms);
     }
 
     const brandRegex = brandPatterns.length > 0 
-      ? brandPatterns.join('|') 
+      ? brandPatterns.map(p => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')
       : 'McDonald|Chipotle|Wingstop|Subway|KFC|Taco Bell|Burger King|Wendy|Chick[- ]?fil[- ]?A|Panda|Five Guys|Panera|Jack in the Box|Popeyes|Domino';
 
-    // Build Overpass QL query
+    // Build Overpass QL query - trying brand-specific first
     const radiusMeters = radiusKm * 1000;
-    const overpassQuery = `
-[out:json][timeout:25];
+    const brandedQuery = `
+[out:json][timeout:30];
 (
   node["amenity"~"^(fast_food|restaurant)$"]["brand"~"(${brandRegex})",i](around:${radiusMeters},${lat},${lng});
   node["amenity"~"^(fast_food|restaurant)$"]["name"~"(${brandRegex})",i](around:${radiusMeters},${lat},${lng});
@@ -192,56 +179,100 @@ Deno.serve(async (req) => {
 out center tags;
     `.trim();
 
-    // Call Overpass API with improved retry logic
-    let overpassData: OverpassResponse | null = null;
-    let retryCount = 0;
-    const maxRetries = 2;
+    // Fallback: generic fast food search if branded fails
+    const genericQuery = `
+[out:json][timeout:30];
+(
+  node["amenity"="fast_food"]["cuisine"~"burger|chicken|pizza|sandwich|mexican"](around:${radiusMeters},${lat},${lng});
+  way["amenity"="fast_food"]["cuisine"~"burger|chicken|pizza|sandwich|mexican"](around:${radiusMeters},${lat},${lng});
+  node["amenity"="fast_food"]["brand"](around:${radiusMeters},${lat},${lng});
+  way["amenity"="fast_food"]["brand"](around:${radiusMeters},${lat},${lng});
+);
+out center tags;
+    `.trim();
 
-    while (retryCount <= maxRetries && !overpassData) {
-      try {
-        console.log(`Calling Overpass API (attempt ${retryCount + 1})`);
-        const overpassResponse = await fetch('https://overpass-api.de/api/interpreter', {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Accept': 'application/json',
-            'User-Agent': 'MacroFinder/1.0 (https://github.com/macrofinder; contact@macrofinder.com)'
-          },
-          body: `data=${encodeURIComponent(overpassQuery)}`,
-        });
+    // Helper function to call Overpass
+    const callOverpass = async (query: string, queryType: string): Promise<OverpassResponse | null> => {
+      let retryCount = 0;
+      const maxRetries = 3;
+      const overpassServers = [
+        'https://overpass-api.de/api/interpreter',
+        'https://overpass.kumi.systems/api/interpreter',
+        'https://overpass.openstreetmap.ru/api/interpreter'
+      ];
 
-        if (overpassResponse.status === 429 || overpassResponse.status === 504) {
-          const jitter = Math.random() * 500;
-          const backoffMs = Math.pow(1.5, retryCount) * 1000 + jitter;
-          console.log(`Rate limited (${overpassResponse.status}), waiting ${Math.round(backoffMs)}ms...`);
-          await new Promise(resolve => setTimeout(resolve, backoffMs));
-          retryCount++;
-          continue;
-        }
+      for (const server of overpassServers) {
+        retryCount = 0;
+        while (retryCount <= maxRetries) {
+          try {
+            console.log(`Calling Overpass (${queryType}, server ${server.split('/')[2]}, attempt ${retryCount + 1})`);
+            const overpassResponse = await fetch(server, {
+              method: 'POST',
+              headers: { 
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Accept': 'application/json',
+                'User-Agent': 'MacroFinder/1.0'
+              },
+              body: `data=${encodeURIComponent(query)}`,
+            });
 
-        if (!overpassResponse.ok) {
-          throw new Error(`Overpass API error: ${overpassResponse.status}`);
-        }
+            if (overpassResponse.status === 429 || overpassResponse.status === 504) {
+              const jitter = Math.random() * 1000;
+              const backoffMs = Math.pow(2, retryCount) * 1000 + jitter;
+              console.log(`Rate limited (${overpassResponse.status}), waiting ${Math.round(backoffMs)}ms...`);
+              await new Promise(resolve => setTimeout(resolve, backoffMs));
+              retryCount++;
+              continue;
+            }
 
-        overpassData = await overpassResponse.json();
-        console.log(`Found ${overpassData.elements.length} OSM elements`);
-      } catch (error) {
-        console.error('Overpass API call failed:', error);
-        if (retryCount < maxRetries) {
-          const jitter = Math.random() * 500;
-          const backoffMs = Math.pow(1.5, retryCount) * 1000 + jitter;
-          await new Promise(resolve => setTimeout(resolve, backoffMs));
-          retryCount++;
-        } else {
-          throw error;
+            if (!overpassResponse.ok) {
+              throw new Error(`Overpass API error: ${overpassResponse.status}`);
+            }
+
+            const data: OverpassResponse = await overpassResponse.json();
+            console.log(`${queryType} query found ${data.elements.length} OSM elements from ${server.split('/')[2]}`);
+            
+            if (data.elements.length > 0) {
+              return data;
+            }
+            
+            // If no results, try next server
+            break;
+          } catch (error) {
+            console.error(`Overpass call failed (${queryType}, ${server.split('/')[2]}):`, error.message);
+            if (retryCount < maxRetries) {
+              const jitter = Math.random() * 1000;
+              const backoffMs = Math.pow(2, retryCount) * 1000 + jitter;
+              await new Promise(resolve => setTimeout(resolve, backoffMs));
+              retryCount++;
+            } else {
+              // Try next server
+              break;
+            }
+          }
         }
       }
+      
+      return null;
+    };
+
+    // Try branded query first
+    let overpassData = await callOverpass(brandedQuery, 'branded');
+    
+    // If no results, try generic fast food query as fallback
+    if (!overpassData || overpassData.elements.length === 0) {
+      console.log('Branded search returned 0 results, trying generic fast food search...');
+      overpassData = await callOverpass(genericQuery, 'generic');
     }
 
     if (!overpassData || overpassData.elements.length === 0) {
-      console.log('No restaurants found in OSM data');
+      console.log('No restaurants found in OSM data after all attempts');
       return new Response(
-        JSON.stringify({ restaurants: [], message: 'No restaurants found nearby' }),
+        JSON.stringify({ 
+          restaurants: [], 
+          count: 0,
+          message: 'No chain restaurants found nearby. This area may not have OSM data coverage.' 
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
