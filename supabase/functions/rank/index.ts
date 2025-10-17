@@ -21,6 +21,7 @@ interface RankRequest {
   mode: 'bulking' | 'cutting';
   limit?: number;
   debug?: boolean;
+  skipCache?: boolean; // Optional flag to bypass cache
 }
 
 interface RawItem {
@@ -56,6 +57,33 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
+// Generate cache key from request parameters
+function generateCacheKey(params: RankRequest): string {
+  // Round lat/lng to 3 decimals (~110m precision) to improve cache hits
+  const lat = params.lat ? Number(params.lat.toFixed(3)) : null;
+  const lng = params.lng ? Number(params.lng.toFixed(3)) : null;
+  
+  // Create a stable key from request parameters
+  const keyObject = {
+    lat,
+    lng,
+    radiusKm: params.radiusKm ?? 8,
+    priceCap: params.priceCap,
+    targetProtein: params.targetProtein,
+    targetCalories: params.targetCalories,
+    minProtein: params.minProtein,
+    includeBrands: params.includeBrands?.sort().join(',') || null,
+    excludeBrands: params.excludeBrands?.sort().join(',') || null,
+    wP: params.wP,
+    wC: params.wC,
+    wR: params.wR,
+    mode: params.mode,
+    limit: params.limit ?? 30,
+  };
+  
+  return JSON.stringify(keyObject);
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -78,8 +106,36 @@ Deno.serve(async (req) => {
     const wR = clamp(body.wR, 0, 5);
     const mode = body.mode || 'bulking';
     const debug = body.debug ?? false;
+    const skipCache = body.skipCache ?? false;
     
-    console.log('Rank request:', { ...body, wP, wC, wR, radiusKm, limit, debug });
+    console.log('Rank request:', { ...body, wP, wC, wR, radiusKm, limit, debug, skipCache });
+
+    // Generate cache key and check cache
+    if (!skipCache) {
+      const cacheKey = generateCacheKey(body);
+      const { data: cachedResult, error: cacheError } = await supabase
+        .from('rank_results_cache')
+        .select('results, created_at')
+        .eq('cache_key', cacheKey)
+        .gt('expires_at', new Date().toISOString())
+        .maybeSingle();
+
+      if (cachedResult && !cacheError) {
+        console.log('Cache HIT - returning cached results');
+        const responseData = debug 
+          ? { ...cachedResult.results, cached: true, cachedAt: cachedResult.created_at }
+          : cachedResult.results;
+        
+        return new Response(
+          JSON.stringify(responseData),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } else {
+        console.log('Cache MISS - calculating results');
+      }
+    } else {
+      console.log('Cache SKIPPED by request');
+    }
 
     // Build SQL query with coalesce for price resilience
     let query = supabase
@@ -269,6 +325,29 @@ Deno.serve(async (req) => {
     const responseData = debug 
       ? { rows: topResults, debug: { brandCount, restaurantCount, itemCount } }
       : topResults;
+
+    // Store results in cache (30-minute TTL)
+    if (!skipCache) {
+      const cacheKey = generateCacheKey(body);
+      const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString(); // 30 minutes from now
+      
+      const { error: cacheInsertError } = await supabase
+        .from('rank_results_cache')
+        .upsert({
+          cache_key: cacheKey,
+          results: responseData,
+          expires_at: expiresAt,
+        }, {
+          onConflict: 'cache_key'
+        });
+
+      if (cacheInsertError) {
+        console.error('Failed to cache results:', cacheInsertError);
+        // Continue anyway - caching failure shouldn't break the response
+      } else {
+        console.log('Results cached successfully');
+      }
+    }
 
     return new Response(
       JSON.stringify(responseData),
