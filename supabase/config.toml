@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.seed_demo]
 verify_jwt = false
+
+[functions.seed_metros]
+verify_jwt = false

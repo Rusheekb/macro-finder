@@ -1,13 +1,20 @@
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Loader2 } from "lucide-react";
 
-const Loader = () => {
+interface LoaderProps {
+  message?: string;
+}
+
+const Loader = ({ message }: LoaderProps) => {
   return (
     <Card>
       <CardHeader>
         <div className="flex items-center gap-2">
-          <Skeleton className="h-5 w-5" />
-          <Skeleton className="h-6 w-32" />
+          <Loader2 className="h-5 w-5 animate-spin text-primary" />
+          <CardTitle className="text-base">
+            {message || "Loading results..."}
+          </CardTitle>
         </div>
       </CardHeader>
       <CardContent>

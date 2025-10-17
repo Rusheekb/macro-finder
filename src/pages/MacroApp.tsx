@@ -12,6 +12,7 @@ import Loader from "@/components/Loader";
 import { rankItems, type RankResult } from "@/api/rank";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { findNearestMetro } from "@/lib/metros";
 
 const STORAGE_KEY = "macroFinder_settings";
 const REFRESH_TIMESTAMP_KEY = "macroFinder_lastRefresh";
@@ -54,6 +55,7 @@ const MacroApp = () => {
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [isRefreshingNearby, setIsRefreshingNearby] = useState(false);
   const [isRefreshingMenus, setIsRefreshingMenus] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState<string>("");
   const [results, setResults] = useState<FoodResult[]>([]);
   const [nearbyRestaurantCount, setNearbyRestaurantCount] = useState<number | null>(null);
   const [isZipModalOpen, setIsZipModalOpen] = useState(false);
@@ -165,6 +167,22 @@ const MacroApp = () => {
     setIsLoading(true);
     
     try {
+      // Check if location is in a seeded metro area
+      let isInSeededArea = false;
+      let nearestMetroInfo = null;
+      if (targets.lat !== undefined && targets.lng !== undefined) {
+        nearestMetroInfo = findNearestMetro(targets.lat, targets.lng, 20);
+        isInSeededArea = nearestMetroInfo !== null;
+        
+        if (isInSeededArea && nearestMetroInfo) {
+          console.log(`📍 Location is near ${nearestMetroInfo.metro.name} (${nearestMetroInfo.distance.toFixed(1)}km away)`);
+          setLoadingMessage(`Loading results near ${nearestMetroInfo.metro.name}...`);
+        } else {
+          console.log('🌍 Location not in pre-seeded area, discovering restaurants...');
+          setLoadingMessage('Discovering restaurants in your area (this may take 10-15 seconds)...');
+        }
+      }
+
       // Check if we need to refresh brand menus (only if location is available)
       if (targets.lat && targets.lng) {
         const lastRefresh = localStorage.getItem(REFRESH_TIMESTAMP_KEY);
@@ -643,7 +661,7 @@ const MacroApp = () => {
               </div>
             )}
             {isLoading ? (
-              <Loader />
+              <Loader message={loadingMessage} />
             ) : (
               <ResultsTable 
                 results={results} 
