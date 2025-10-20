@@ -172,23 +172,9 @@ const ResultsTable = ({ results, onPriceUpdate }: ResultsTableProps) => {
     </div>
   );
 
-  if (results.length === 0) {
-    return (
-      <Card>
-        <CardContent className="flex flex-col items-center justify-center py-12">
-          <Utensils className="h-12 w-12 text-muted-foreground mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No Results Yet</h3>
-          <p className="text-muted-foreground text-center">
-            Set your macro targets and click "Find Foods" to discover options near you.
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
     <>
-      <Card>
+      <Card className="animate-in fade-in-50 duration-500">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
@@ -269,7 +255,11 @@ const ResultsTable = ({ results, onPriceUpdate }: ResultsTableProps) => {
               </thead>
               <tbody>
                 {sortedResults.map((result, index) => (
-                  <tr key={result.id} className="border-b hover:bg-muted/50">
+                  <tr 
+                    key={result.id} 
+                    className="border-b hover:bg-muted/50 transition-colors animate-in fade-in-50 duration-300"
+                    style={{ animationDelay: `${index * 50}ms` }}
+                  >
                     <td className="py-3">
                       <Badge 
                         variant={index < 3 ? "default" : "secondary"}
@@ -301,7 +291,11 @@ const ResultsTable = ({ results, onPriceUpdate }: ResultsTableProps) => {
           {/* Mobile Cards */}
           <div className="md:hidden space-y-4">
             {sortedResults.map((result, index) => (
-              <Card key={result.id} className="p-4">
+              <Card 
+                key={result.id} 
+                className="p-4 animate-in fade-in-50 duration-300"
+                style={{ animationDelay: `${index * 50}ms` }}
+              >
                 <div className="flex justify-between items-start mb-3">
                   <div>
                     <h3 className="font-semibold">{result.name}</h3>

@@ -1,14 +1,15 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Loader2 } from "lucide-react";
+import { Loader2, Search, MapPin } from "lucide-react";
 
 interface LoaderProps {
   message?: string;
+  progress?: number;
 }
 
-const Loader = ({ message }: LoaderProps) => {
+const Loader = ({ message, progress }: LoaderProps) => {
   return (
-    <Card>
+    <Card className="overflow-hidden">
       <CardHeader>
         <div className="flex items-center gap-2">
           <Loader2 className="h-5 w-5 animate-spin text-primary" />
@@ -16,6 +17,17 @@ const Loader = ({ message }: LoaderProps) => {
             {message || "Loading results..."}
           </CardTitle>
         </div>
+        
+        {progress !== undefined && (
+          <div className="mt-3">
+            <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-primary transition-all duration-500 ease-out"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
+        )}
       </CardHeader>
       <CardContent>
         {/* Desktop skeleton */}

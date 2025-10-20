@@ -9,6 +9,8 @@ import { Label } from "@/components/ui/label";
 import ControlsPanel from "@/components/ControlsPanel";
 import ResultsTable from "@/components/ResultsTable";
 import Loader from "@/components/Loader";
+import EmptyState from "@/components/EmptyState";
+import ErrorState from "@/components/ErrorState";
 import { rankItems, type RankResult } from "@/api/rank";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -56,7 +58,10 @@ const MacroApp = () => {
   const [isRefreshingNearby, setIsRefreshingNearby] = useState(false);
   const [isRefreshingMenus, setIsRefreshingMenus] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState<string>("");
+  const [loadingProgress, setLoadingProgress] = useState<number>(0);
   const [results, setResults] = useState<FoodResult[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [isRetrying, setIsRetrying] = useState(false);
   const [nearbyRestaurantCount, setNearbyRestaurantCount] = useState<number | null>(null);
   const [isZipModalOpen, setIsZipModalOpen] = useState(false);
   const [zipInput, setZipInput] = useState("");
@@ -165,8 +170,11 @@ const MacroApp = () => {
     });
     
     setIsLoading(true);
+    setError(null);
+    setLoadingProgress(0);
     
     try {
+      setLoadingProgress(10);
       // Check if location is in a seeded metro area
       let isInSeededArea = false;
       let nearestMetroInfo = null;
@@ -182,6 +190,8 @@ const MacroApp = () => {
           setLoadingMessage('Discovering restaurants in your area (this may take 10-15 seconds)...');
         }
       }
+      
+      setLoadingProgress(25);
 
       // Check if we need to refresh brand menus (only if location is available)
       if (targets.lat && targets.lng) {
@@ -200,6 +210,7 @@ const MacroApp = () => {
         // Refresh if never refreshed, forced, or last refresh was more than 30 minutes ago
         if (shouldRefresh) {
           setIsRefreshingMenus(true);
+          setLoadingProgress(40);
           console.log('🔄 [REFRESH] Calling refresh_brand_menus edge function...');
           
           try {
@@ -239,6 +250,7 @@ const MacroApp = () => {
         console.warn('⚠️ [SEARCH FLOW] No location available, skipping menu refresh');
       }
 
+      setLoadingProgress(60);
       console.log('🎯 [RANK] Calling rankItems edge function...');
       const rankResults = await rankItems({
         mode: targets.mode,
@@ -256,6 +268,7 @@ const MacroApp = () => {
         lng: targets.lng,
       });
 
+      setLoadingProgress(80);
       console.log('✅ [RANK] Received results:', { count: rankResults.length });
 
       // Map to FoodResult format
@@ -273,6 +286,7 @@ const MacroApp = () => {
         priceUpdatedAt: item.priceUpdatedAt,
       }));
 
+      setLoadingProgress(100);
       setResults(mappedResults);
 
       if (mappedResults.length === 0) {
@@ -283,14 +297,17 @@ const MacroApp = () => {
       }
     } catch (error) {
       console.error("Search failed:", error);
+      const errorMessage = error instanceof Error ? error.message : "Unable to fetch results. Please try again.";
+      setError(errorMessage);
       toast({
         title: "Search failed",
-        description: "Unable to fetch results. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
       setResults([]);
     } finally {
       setIsLoading(false);
+      setLoadingProgress(0);
     }
   }, [targets, toast]);
 
@@ -426,7 +443,15 @@ const MacroApp = () => {
     console.log('🔄 [FORCE REFRESH] User clicked force refresh button');
     // Clear the refresh timestamp to force a refresh
     localStorage.removeItem(REFRESH_TIMESTAMP_KEY);
+    setError(null);
     await performSearch(true);
+  };
+
+  const handleRetry = async () => {
+    setIsRetrying(true);
+    setError(null);
+    await performSearch(false);
+    setIsRetrying(false);
   };
 
   const handleLoadDemoData = useCallback(async () => {
@@ -661,7 +686,20 @@ const MacroApp = () => {
               </div>
             )}
             {isLoading ? (
-              <Loader message={loadingMessage} />
+              <Loader message={loadingMessage} progress={loadingProgress} />
+            ) : error ? (
+              <ErrorState 
+                message={error} 
+                onRetry={handleRetry} 
+                isRetrying={isRetrying}
+              />
+            ) : results.length === 0 ? (
+              <EmptyState 
+                hasLocation={!!(targets.lat && targets.lng)}
+                onFindFoods={handleFindFoods}
+                onLoadDemo={dbStatus?.brandCount === 0 ? handleLoadDemoData : undefined}
+                isLoadingDemo={isLoadingDemo}
+              />
             ) : (
               <ResultsTable 
                 results={results} 
