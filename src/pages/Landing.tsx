@@ -3,15 +3,25 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, Target, Calculator, Zap } from "lucide-react";
+import { TrendingUp, Target, Calculator, Zap, LogIn, LogOut } from "lucide-react";
 import heroImage from "@/assets/macro-finder-hero.jpg";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Landing = () => {
   const [selectedMode, setSelectedMode] = useState<"bulking" | "cutting">("bulking");
   const navigate = useNavigate();
+  const { user, signOut } = useAuth();
 
   const handleGetStarted = () => {
-    navigate(`/app?mode=${selectedMode}`);
+    if (user) {
+      navigate(`/app?mode=${selectedMode}`);
+    } else {
+      navigate("/auth");
+    }
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
   };
 
   return (
@@ -23,6 +33,21 @@ const Landing = () => {
           style={{ backgroundImage: `url(${heroImage})` }}
         />
         <div className="relative container mx-auto px-4 py-16">
+          {/* Header with Auth Button */}
+          <div className="flex justify-end mb-8">
+            {user ? (
+              <Button variant="outline" onClick={handleSignOut} className="gap-2">
+                <LogOut className="h-4 w-4" />
+                Sign Out
+              </Button>
+            ) : (
+              <Button variant="outline" onClick={() => navigate("/auth")} className="gap-2">
+                <LogIn className="h-4 w-4" />
+                Sign In
+              </Button>
+            )}
+          </div>
+          
           {/* Header */}
           <div className="text-center mb-16">
             <div className="flex items-center justify-center gap-2 mb-6">
@@ -132,10 +157,10 @@ const Landing = () => {
             onClick={handleGetStarted}
             className="px-8 py-6 text-lg font-semibold"
           >
-            Get Started with {selectedMode === "bulking" ? "Bulking" : "Cutting"}
+            {user ? `Continue with ${selectedMode === "bulking" ? "Bulking" : "Cutting"}` : "Get Started"}
           </Button>
           <p className="text-sm text-muted-foreground mt-4">
-            Set your targets and find the perfect foods for your goals
+            {user ? "Your preferences are saved" : "Create an account to save your preferences"}
           </p>
         </div>
       </div>

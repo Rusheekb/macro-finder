@@ -121,6 +121,27 @@ export type Database = {
           },
         ]
       }
+      profiles: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       rank_results_cache: {
         Row: {
           cache_key: string
@@ -197,6 +218,57 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_preferences: {
+        Row: {
+          created_at: string
+          exclude_brands: string[] | null
+          include_brands: string[] | null
+          min_protein: number | null
+          mode: string
+          price_cap: number | null
+          radius_km: number | null
+          target_calories: number | null
+          target_protein: number | null
+          updated_at: string
+          user_id: string
+          w_c: number | null
+          w_p: number | null
+          w_r: number | null
+        }
+        Insert: {
+          created_at?: string
+          exclude_brands?: string[] | null
+          include_brands?: string[] | null
+          min_protein?: number | null
+          mode?: string
+          price_cap?: number | null
+          radius_km?: number | null
+          target_calories?: number | null
+          target_protein?: number | null
+          updated_at?: string
+          user_id: string
+          w_c?: number | null
+          w_p?: number | null
+          w_r?: number | null
+        }
+        Update: {
+          created_at?: string
+          exclude_brands?: string[] | null
+          include_brands?: string[] | null
+          min_protein?: number | null
+          mode?: string
+          price_cap?: number | null
+          radius_km?: number | null
+          target_calories?: number | null
+          target_protein?: number | null
+          updated_at?: string
+          user_id?: string
+          w_c?: number | null
+          w_p?: number | null
+          w_r?: number | null
+        }
+        Relationships: []
       }
     }
     Views: {

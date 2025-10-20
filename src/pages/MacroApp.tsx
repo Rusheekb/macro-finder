@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, MapPin, AlertTriangle } from "lucide-react";
+import { ArrowLeft, MapPin, AlertTriangle, User, LogOut } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import ControlsPanel from "@/components/ControlsPanel";
 import ResultsTable from "@/components/ResultsTable";
 import Loader from "@/components/Loader";
@@ -15,6 +16,7 @@ import { rankItems, type RankResult } from "@/api/rank";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { findNearestMetro } from "@/lib/metros";
+import { useAuth } from "@/contexts/AuthContext";
 
 const STORAGE_KEY = "macroFinder_settings";
 const REFRESH_TIMESTAMP_KEY = "macroFinder_lastRefresh";
@@ -53,6 +55,7 @@ const MacroApp = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user, signOut } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [isRefreshingNearby, setIsRefreshingNearby] = useState(false);
@@ -120,6 +123,73 @@ const MacroApp = () => {
   };
 
   const [targets, setTargets] = useState<MacroTargets>(getInitialTargets);
+
+  // Load user preferences from database
+  useEffect(() => {
+    if (!user) return;
+
+    const loadUserPreferences = async () => {
+      const { data, error } = await supabase
+        .from('user_preferences')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (error) {
+        console.error('Failed to load user preferences:', error);
+        return;
+      }
+
+      if (data) {
+        setTargets({
+          mode: data.mode as "bulking" | "cutting",
+          targetProtein: data.target_protein,
+          targetCalories: data.target_calories,
+          wP: Number(data.w_p),
+          wC: Number(data.w_c),
+          wR: Number(data.w_r),
+          radiusKm: Number(data.radius_km),
+          priceCap: Number(data.price_cap),
+          minProtein: data.min_protein,
+          includeBrands: data.include_brands || undefined,
+          excludeBrands: data.exclude_brands || undefined,
+        });
+      }
+    };
+
+    loadUserPreferences();
+  }, [user]);
+
+  // Save user preferences to database when they change
+  useEffect(() => {
+    if (!user || isInitialMount.current) return;
+
+    const saveUserPreferences = async () => {
+      const { error } = await supabase
+        .from('user_preferences')
+        .upsert({
+          user_id: user.id,
+          mode: targets.mode,
+          target_protein: targets.targetProtein,
+          target_calories: targets.targetCalories,
+          w_p: targets.wP,
+          w_c: targets.wC,
+          w_r: targets.wR,
+          radius_km: targets.radiusKm,
+          price_cap: targets.priceCap,
+          min_protein: targets.minProtein,
+          include_brands: targets.includeBrands || null,
+          exclude_brands: targets.excludeBrands || null,
+        });
+
+      if (error) {
+        console.error('Failed to save user preferences:', error);
+      }
+    };
+
+    const timeoutId = setTimeout(saveUserPreferences, 1000);
+    return () => clearTimeout(timeoutId);
+  }, [user, targets]);
 
   // Fetch database status on mount
   useEffect(() => {
@@ -643,22 +713,46 @@ const MacroApp = () => {
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-6">
         {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate("/")}
-            className="flex items-center gap-2"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Home
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold">MacroFinder</h1>
-            <p className="text-muted-foreground">
-              Find foods that match your {targets.mode} goals
-            </p>
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/")}
+              className="flex items-center gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Home
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold">MacroFinder</h1>
+              <p className="text-muted-foreground">
+                Find foods that match your {targets.mode} goals
+              </p>
+            </div>
           </div>
+          
+          {/* User Menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="rounded-full">
+                <User className="h-5 w-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>
+                {user?.email}
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={async () => {
+                await signOut();
+                navigate("/");
+              }}>
+                <LogOut className="mr-2 h-4 w-4" />
+                Sign Out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         <div className="grid lg:grid-cols-3 gap-8">
