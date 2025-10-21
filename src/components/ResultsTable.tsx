@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowUpDown, Star, MapPin, DollarSign, Utensils, Edit, Loader2, Download, ArrowUp, ArrowDown } from "lucide-react";
 import { FoodResult } from "@/pages/MacroApp";
+import { PriceUpdateDialog } from "@/components/PriceUpdateDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
@@ -153,22 +154,20 @@ const ResultsTable = ({ results, onPriceUpdate }: ResultsTableProps) => {
   );
 
   const PriceCell = ({ result }: { result: FoodResult }) => (
-    <div className="flex items-center gap-2">
-      <span>${result.price.toFixed(2)}</span>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => openPriceModal(result)}
-        className="h-6 w-6 p-0"
-        title="Report local price"
-      >
-        <Edit className="h-3 w-3" />
-      </Button>
+    <div className="flex flex-col items-start gap-2">
+      <span className="font-medium">${result.price.toFixed(2)}</span>
       {result.priceUpdatedAt && (
         <Badge variant="secondary" className="text-xs">
           Updated {formatDistanceToNow(new Date(result.priceUpdatedAt), { addSuffix: true })}
         </Badge>
       )}
+      <PriceUpdateDialog
+        restaurantId={result.restaurantId}
+        itemId={result.itemId}
+        currentPrice={result.price}
+        itemName={result.name}
+        restaurantName={result.restaurant}
+      />
     </div>
   );
 
@@ -325,15 +324,16 @@ const ResultsTable = ({ results, onPriceUpdate }: ResultsTableProps) => {
                   <div className="flex items-center gap-2 col-span-2">
                     <DollarSign className="h-4 w-4 text-muted-foreground" />
                     <span className="text-sm">${result.price.toFixed(2)}</span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => openPriceModal(result)}
-                      className="h-6 px-2"
-                    >
-                      <Edit className="h-3 w-3 mr-1" />
-                      Report Price
-                    </Button>
+                  </div>
+                  
+                  <div className="col-span-2">
+                    <PriceUpdateDialog
+                      restaurantId={result.restaurantId}
+                      itemId={result.itemId}
+                      currentPrice={result.price}
+                      itemName={result.name}
+                      restaurantName={result.restaurant}
+                    />
                   </div>
                   
                   {result.priceUpdatedAt && (

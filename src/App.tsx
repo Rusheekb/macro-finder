@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Landing from "./pages/Landing";
 import MacroApp from "./pages/MacroApp";
 import Auth from "./pages/Auth";
+import Admin from "./pages/Admin";
 import AdminImport from "./pages/AdminImport";
 import AdminBrandImport from "./pages/AdminBrandImport";
 import Install from "./pages/Install";
@@ -29,8 +30,21 @@ const App = () => (
             </ProtectedRoute>
           } />
           <Route path="/install" element={<Install />} />
-          <Route path="/admin/import" element={<AdminImport />} />
-          <Route path="/admin/brand-import" element={<AdminBrandImport />} />
+          <Route path="/admin" element={
+            <ProtectedRoute>
+              <Admin />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/import" element={
+            <ProtectedRoute>
+              <AdminImport />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/brand-import" element={
+            <ProtectedRoute>
+              <AdminBrandImport />
+            </ProtectedRoute>
+          } />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

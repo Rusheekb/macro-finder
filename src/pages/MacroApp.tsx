@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, MapPin, AlertTriangle, User, LogOut } from "lucide-react";
+import { ArrowLeft, MapPin, AlertTriangle, User, LogOut, Settings } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -744,6 +744,10 @@ const MacroApp = () => {
                 {user?.email}
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => navigate('/admin')}>
+                <Settings className="mr-2 h-4 w-4" />
+                Admin Dashboard
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={async () => {
                 await signOut();
                 navigate("/");
