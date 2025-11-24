@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.seed_metros]
 verify_jwt = false
+
+[functions.bulk_upsert_menu_items]
+verify_jwt = false
