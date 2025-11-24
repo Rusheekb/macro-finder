@@ -9,6 +9,7 @@ import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
 import AdminImport from "./pages/AdminImport";
 import AdminBrandImport from "./pages/AdminBrandImport";
+import AdminMenuUpload from "./pages/AdminMenuUpload";
 import Install from "./pages/Install";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -43,6 +44,11 @@ const App = () => (
           <Route path="/admin/brand-import" element={
             <ProtectedRoute>
               <AdminBrandImport />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/menu-upload" element={
+            <ProtectedRoute>
+              <AdminMenuUpload />
             </ProtectedRoute>
           } />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

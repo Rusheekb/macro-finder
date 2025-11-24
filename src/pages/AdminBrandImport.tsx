@@ -21,6 +21,9 @@ interface ImportResult {
   source: 'nutritionix' | 'usda';
   total: number;
   brand: string;
+  totalRaw?: number;
+  totalMatched?: number;
+  reason?: string;
 }
 
 const AdminBrandImport = () => {
@@ -240,6 +243,32 @@ const AdminBrandImport = () => {
                   <div className="text-sm text-muted-foreground">Total Items Processed</div>
                   <div className="text-2xl font-bold">{lastResult.total}</div>
                 </div>
+                
+                {(lastResult.totalRaw !== undefined || lastResult.totalMatched !== undefined) && (
+                  <div className="pt-2 border-t space-y-2">
+                    {lastResult.totalRaw !== undefined && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Raw items from API:</span>
+                        <span className="font-medium">{lastResult.totalRaw}</span>
+                      </div>
+                    )}
+                    {lastResult.totalMatched !== undefined && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Matched after filtering:</span>
+                        <span className="font-medium">{lastResult.totalMatched}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {lastResult.reason && (
+                  <div className="pt-2 border-t">
+                    <div className="flex items-center gap-2 text-destructive">
+                      <XCircle className="h-4 w-4" />
+                      <span className="text-sm font-medium">{lastResult.reason}</span>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

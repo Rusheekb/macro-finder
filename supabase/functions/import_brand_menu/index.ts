@@ -64,6 +64,8 @@ interface NutritionixItem {
   nf_calories: number;
   nf_protein: number;
   tag_id?: string;
+  nix_brand_id?: string;
+  brand_name?: string;
 }
 
 interface USDAFoodItem {
@@ -75,6 +77,11 @@ interface USDAFoodItem {
     calories?: { value: number };
   };
 }
+
+// Helper function to normalize strings for comparison
+const normalize = (s: string | undefined | null): string => {
+  return (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+};
 
 Deno.serve(async (req) => {
   // Handle CORS preflight
@@ -115,15 +122,17 @@ Deno.serve(async (req) => {
 
     let items: Array<{ item_name: string; calories: number; protein_g: number; external_ref: string }> = [];
     let source: "nutritionix" | "usda" = "nutritionix";
+    let totalRaw = 0;
+    let totalMatched = 0;
 
     // Try Nutritionix first
     const nutritionixAppId = Deno.env.get("NUTRITIONIX_APP_ID_CORRECT");
     const nutritionixApiKey = Deno.env.get("NUTRITIONIX_API_KEY");
     const nutritionixBrandId = NUTRITIONIX_BRAND_MAP[chainKey];
 
-    if (nutritionixAppId && nutritionixApiKey && nutritionixBrandId) {
+    if (nutritionixAppId && nutritionixApiKey) {
       try {
-        console.log(`Fetching from Nutritionix for brand ${nutritionixBrandId}`);
+        console.log(`Fetching from Nutritionix for brand ${brand.display_name}`);
 
         const nutritionixResponse = await fetch(
           `https://trackapi.nutritionix.com/v2/search/instant?query=${encodeURIComponent(brand.display_name)}`,
@@ -138,17 +147,55 @@ Deno.serve(async (req) => {
         if (nutritionixResponse.ok) {
           const data = await nutritionixResponse.json();
           const brandedItems = data.branded || [];
+          totalRaw = brandedItems.length;
 
-          console.log(`Nutritionix returned ${brandedItems.length} items`);
+          console.log(`Nutritionix returned ${totalRaw} raw items`);
 
-          items = brandedItems
-            .filter((item: NutritionixItem) => item.tag_id === nutritionixBrandId)
+          const normalizedBrandName = normalize(brand.display_name);
+          
+          // Filter items that match the brand using multiple strategies
+          const matchedItems = brandedItems.filter((item: NutritionixItem) => {
+            // Strategy 1: Match by nix_brand_id if available and we have a mapping
+            if (nutritionixBrandId && item.nix_brand_id === nutritionixBrandId) {
+              return true;
+            }
+            
+            // Strategy 2: Match by normalized brand name
+            const itemBrandNorm = normalize(item.brand_name);
+            if (itemBrandNorm === normalizedBrandName) {
+              return true;
+            }
+            
+            // Strategy 3: Brand name contains our chain key
+            if (itemBrandNorm.includes(normalize(chainKey))) {
+              return true;
+            }
+            
+            return false;
+          });
+
+          totalMatched = matchedItems.length;
+          console.log(`Nutritionix matched ${totalMatched} items after filtering`);
+
+          // Remove duplicates by normalized item name
+          const seenItems = new Set<string>();
+          items = matchedItems
+            .filter((item: NutritionixItem) => {
+              const normName = normalize(item.food_name);
+              if (seenItems.has(normName)) {
+                return false;
+              }
+              seenItems.add(normName);
+              return true;
+            })
             .map((item: NutritionixItem) => ({
               item_name: item.food_name,
               calories: Math.round(item.nf_calories || 0),
               protein_g: Math.round(item.nf_protein || 0),
-              external_ref: `nutritionix:${nutritionixBrandId}:${item.food_name}`,
+              external_ref: `nutritionix:${item.nix_brand_id || nutritionixBrandId || 'unknown'}:${item.food_name}`,
             }));
+          
+          console.log(`Nutritionix final count after deduplication: ${items.length}`);
         } else if (nutritionixResponse.status === 429) {
           console.log("Nutritionix rate limited, falling back to USDA");
         } else {
@@ -181,22 +228,47 @@ Deno.serve(async (req) => {
         if (usdaResponse.ok) {
           const data = await usdaResponse.json();
           const foods = data.foods || [];
+          totalRaw = foods.length;
 
-          console.log(`USDA returned ${foods.length} items`);
+          console.log(`USDA returned ${totalRaw} raw items`);
 
-          items = foods
-            .filter(
-              (food: USDAFoodItem) =>
-                food.brandOwner?.toLowerCase().includes(chainKey.replace("_", " ")) ||
-                food.description?.toLowerCase().includes(chainKey.replace("_", " ")),
-            )
+          const normalizedChainKey = normalize(chainKey);
+          const normalizedBrandName = normalize(brand.display_name);
+          
+          const matchedFoods = foods.filter((food: USDAFoodItem) => {
+            const brandOwnerNorm = normalize(food.brandOwner);
+            const descriptionNorm = normalize(food.description);
+            
+            // Match by brand owner or description containing our brand
+            return (
+              brandOwnerNorm.includes(normalizedChainKey) ||
+              brandOwnerNorm.includes(normalizedBrandName) ||
+              descriptionNorm.includes(normalizedChainKey) ||
+              descriptionNorm.includes(normalizedBrandName)
+            );
+          });
+
+          totalMatched = matchedFoods.length;
+          console.log(`USDA matched ${totalMatched} items after filtering`);
+
+          // Remove duplicates and filter out items with no calorie data
+          const seenItems = new Set<string>();
+          items = matchedFoods
             .map((food: USDAFoodItem) => ({
               item_name: food.description,
               calories: Math.round(food.labelNutrients?.calories?.value || 0),
               protein_g: Math.round(food.labelNutrients?.protein?.value || 0),
               external_ref: `usda:${food.fdcId}`,
             }))
-            .filter((item) => item.calories > 0); // Filter out items with no calorie data
+            .filter((item) => {
+              if (item.calories === 0) return false;
+              const normName = normalize(item.item_name);
+              if (seenItems.has(normName)) return false;
+              seenItems.add(normName);
+              return true;
+            });
+          
+          console.log(`USDA final count after filtering: ${items.length}`);
         } else {
           throw new Error(`USDA API error: ${usdaResponse.status}`);
         }
@@ -210,11 +282,18 @@ Deno.serve(async (req) => {
     }
 
     if (items.length === 0) {
+      const reason = totalRaw === 0 
+        ? "No items returned from API" 
+        : `Filtered out all ${totalRaw} items - brand name mismatch`;
+      
       return new Response(
         JSON.stringify({
           inserted: 0,
           updated: 0,
           source,
+          totalRaw,
+          totalMatched,
+          reason,
           message: "No menu items found",
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -240,6 +319,8 @@ Deno.serve(async (req) => {
         calories: item.calories,
         protein_g: item.protein_g,
         external_ref: item.external_ref,
+        data_source: source,
+        verification_status: 'unverified',
         // Only set default_price if it doesn't exist
         ...(existingItem?.default_price ? {} : { default_price: null }),
       };
@@ -252,6 +333,8 @@ Deno.serve(async (req) => {
             calories: itemData.calories,
             protein_g: itemData.protein_g,
             external_ref: itemData.external_ref,
+            data_source: itemData.data_source,
+            verification_status: itemData.verification_status,
           })
           .eq("id", existingItem.id);
 
@@ -283,6 +366,8 @@ Deno.serve(async (req) => {
         updated,
         source,
         total: items.length,
+        totalRaw,
+        totalMatched,
         brand: brand.display_name,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },

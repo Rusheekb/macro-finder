@@ -153,17 +153,35 @@ const Admin = () => {
               <CardHeader>
                 <CardTitle>Import Menu Data</CardTitle>
                 <CardDescription>
-                  Import menu items from nutrition databases
+                  Import menu items from nutrition databases or manual CSV upload
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Use the brand import tools to fetch menu data from Nutritionix and USDA databases
-                </p>
-                <Button onClick={() => navigate('/admin/import')}>
-                  <Upload className="h-4 w-4 mr-2" />
-                  Go to Import Tools
-                </Button>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div>
+                    <h3 className="font-medium">API Import (Nutritionix/USDA)</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Fetch menu data automatically from nutrition databases
+                    </p>
+                  </div>
+                  <Button onClick={() => navigate('/admin/brand-import')}>
+                    <Upload className="h-4 w-4 mr-2" />
+                    Brand Import
+                  </Button>
+                </div>
+                
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div>
+                    <h3 className="font-medium">Manual CSV Upload</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Upload menu items from a CSV file for manual curation
+                    </p>
+                  </div>
+                  <Button onClick={() => navigate('/admin/menu-upload')}>
+                    <Upload className="h-4 w-4 mr-2" />
+                    CSV Upload
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

@@ -82,34 +82,46 @@ export type Database = {
           brand_id: string | null
           calories: number | null
           created_at: string | null
+          data_source: string | null
           default_price: number | null
           external_ref: string | null
           id: string
           item_name: string
+          last_verified_at: string | null
+          notes: string | null
           protein_g: number | null
           updated_at: string | null
+          verification_status: string | null
         }
         Insert: {
           brand_id?: string | null
           calories?: number | null
           created_at?: string | null
+          data_source?: string | null
           default_price?: number | null
           external_ref?: string | null
           id?: string
           item_name: string
+          last_verified_at?: string | null
+          notes?: string | null
           protein_g?: number | null
           updated_at?: string | null
+          verification_status?: string | null
         }
         Update: {
           brand_id?: string | null
           calories?: number | null
           created_at?: string | null
+          data_source?: string | null
           default_price?: number | null
           external_ref?: string | null
           id?: string
           item_name?: string
+          last_verified_at?: string | null
+          notes?: string | null
           protein_g?: number | null
           updated_at?: string | null
+          verification_status?: string | null
         }
         Relationships: [
           {
